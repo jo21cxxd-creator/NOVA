@@ -1,5 +1,4 @@
-cat > /mnt/user-data/outputs/novacore_completo.lua << 'EOF'
--- NOVACORE HUB v3.0
+-- NOVACORE HUB v3.1 (Fixed)
 -- Made BY JO21CX
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/jo21cxxd-creator/NOVA/refs/heads/main/nova"))()
 
@@ -392,13 +391,16 @@ end)
 -- ============================================================
 local fishCfg = {fish=false, shake=false, reel=false}
 local fishStats = {cast=0, catch=0}
-local fishLoop = nil
+local fishThread = nil
 local fishState = "idle"
 local isHolding = false
 
+-- FIX #1: getVU() con fallback seguro para cualquier executor
 local function getVU()
-    if cloneref then return cloneref(game:GetService("VirtualUser")) end
-    return game:GetService("VirtualUser")
+    local ok, vu = pcall(function()
+        return cloneref(game:GetService("VirtualUser"))
+    end)
+    return (ok and vu) or game:GetService("VirtualUser")
 end
 
 local function vuDown()
@@ -440,7 +442,6 @@ local function holdOff()
     end
 end
 
--- Detectar caña lanzada: bobber MeshPart en workspace
 local function isCasting()
     for _, v in pairs(workspace:GetDescendants()) do
         if v.Name == "bobber" and v:IsA("MeshPart") then
@@ -450,28 +451,31 @@ local function isCasting()
     return false
 end
 
--- Detectar shake: shakeui habilitado con safezone visible
 local function isShaking()
     local shakeui = PGui:FindFirstChild("shakeui")
     return shakeui ~= nil and shakeui.Enabled == true
 end
 
--- Detectar reel: reel ScreenGui habilitado
 local function isReeling()
     local reel = PGui:FindFirstChild("reel")
     return reel ~= nil and reel.Enabled == true
 end
 
--- Detectar captura exitosa
+-- FIX #2: isCaught() mejorado — detecta GUI de resultado o desaparicion del reel
 local function isCaught()
-    local catchGui = PGui:FindFirstChild("catch")
-    if catchGui then return true end
-    -- fallback: reel desaparece y fish frame aparece con resultado
+    if PGui:FindFirstChild("catch") then return true end
+    if PGui:FindFirstChild("fishcatch") then return true end
+    if PGui:FindFirstChild("catchresult") then return true end
+    -- Detectar cualquier GUI con "catch" o "result" en el nombre
+    for _, gui in pairs(PGui:GetChildren()) do
+        local n = gui.Name:lower()
+        if n:find("catch") or n:find("result") then
+            return true
+        end
+    end
     return false
 end
 
--- SHAKE: clickear el ImageButton exacto
--- PATH: shakeui.safezone.button
 local function doShake()
     pcall(function()
         local shakeui = PGui:FindFirstChild("shakeui")
@@ -480,49 +484,34 @@ local function doShake()
         if not safezone then return end
         local button = safezone:FindFirstChild("button")
         if not button or not button.Visible then return end
-        -- Clickear en la posicion del boton
         local pos = button.AbsolutePosition + button.AbsoluteSize/2
         clickAt(pos)
     end)
 end
 
--- REEL: hold/release segun posicion pez vs playerbar
--- PATH: reel.bar.fish y reel.bar.playerbar
--- modal es el boton que controla el hold
 local function doReel()
     pcall(function()
         local reel = PGui:FindFirstChild("reel")
         if not reel then
-            -- fallback oscilacion
             holdOn() task.wait(0.06) holdOff() task.wait(0.06)
             return
         end
-
         local bar = reel:FindFirstChild("bar")
         if not bar then
             holdOn() task.wait(0.06) holdOff() task.wait(0.06)
             return
         end
-
-        local fishFrame   = bar:FindFirstChild("fish")
-        local playerbar   = bar:FindFirstChild("playerbar")
-
+        local fishFrame = bar:FindFirstChild("fish")
+        local playerbar = bar:FindFirstChild("playerbar")
         if not fishFrame or not playerbar then
             holdOn() task.wait(0.06) holdOff() task.wait(0.06)
             return
         end
-
-        -- Posicion X del pez (indicador que se mueve)
-        local fishX    = fishFrame.AbsolutePosition.X + fishFrame.AbsoluteSize.X/2
-        -- Zona del playerbar (rectangulo blanco donde debe estar el pez)
-        local pbLeft   = playerbar.AbsolutePosition.X
-        local pbRight  = pbLeft + playerbar.AbsoluteSize.X
-        local pbCenter = pbLeft + playerbar.AbsoluteSize.X/2
-        local margin   = 6
-
-        -- Si el pez esta a la izquierda del playerbar: HOLD (mueve derecha)
-        -- Si el pez esta a la derecha del playerbar: RELEASE (mueve izquierda)
-        -- Si esta dentro: mantener centrado
+        local fishX   = fishFrame.AbsolutePosition.X + fishFrame.AbsoluteSize.X/2
+        local pbLeft  = playerbar.AbsolutePosition.X
+        local pbRight = pbLeft + playerbar.AbsoluteSize.X
+        local pbCenter= pbLeft + playerbar.AbsoluteSize.X/2
+        local margin  = 6
         if fishX < pbLeft + margin then
             holdOn()
         elseif fishX > pbRight - margin then
@@ -535,7 +524,6 @@ local function doReel()
     end)
 end
 
--- CAST: mantener click para llenar barra de poder, soltar
 local function doCast()
     pcall(function()
         holdOn()
@@ -546,7 +534,6 @@ local function doCast()
     end)
 end
 
--- ROD
 local function hasRod()
     local ch = LP.Character
     if not ch then return false end
@@ -568,80 +555,93 @@ local function equipRod()
                 local n = t.Name:lower()
                 if n:find("rod") or n:find("fish") or n:find("cana") then
                     local h = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
-                    if h then h:EquipTool(t) task.wait(0.8) end
+                    if h then
+                        h:EquipTool(t)
+                        task.wait(0.8)
+                    end
                 end
             end
         end
     end)
 end
 
-local caughtCd = false
-
+-- FIX #3: loop de pesca como task.spawn con while, NO Heartbeat
+-- Esto permite usar task.wait() correctamente dentro del loop
 local function startFish()
-    if fishLoop then fishLoop:Disconnect() fishLoop = nil end
+    -- Detener loop anterior si existe
+    if fishThread then
+        task.cancel(fishThread)
+        fishThread = nil
+    end
     fishState = "idle"
     holdOff()
 
-    fishLoop = RunService.Heartbeat:Connect(function()
-        if not fishCfg.fish then holdOff() return end
-        pcall(function()
-            -- 1. Caña equipada
-            if not hasRod() then
-                fishState = "equipping"
-                holdOff()
-                equipRod()
-                return
-            end
-
-            -- 2. REEL activo - maxima prioridad
-            if isReeling() then
-                fishState = "reeling"
-                if fishCfg.reel then
-                    doReel()
-                end
-                task.wait(0.05)
-                return
-            end
-
-            -- 3. Pez capturado
-            if isCaught() then
-                if not caughtCd then
-                    caughtCd = true
-                    fishState = "caught"
-                    fishStats.catch = fishStats.catch + 1
+    fishThread = task.spawn(function()
+        local caughtCd = false
+        while fishCfg.fish do
+            pcall(function()
+                -- 1. Equip caña
+                if not hasRod() then
+                    fishState = "equipping"
                     holdOff()
-                    task.wait(2.5)
-                    caughtCd = false
-                    fishState = "idle"
+                    equipRod()
+                    return
                 end
-                return
-            end
 
-            -- 4. Caña en agua - shake si aparece
-            if isCasting() then
-                fishState = "waiting"
-                if fishCfg.shake and isShaking() then
-                    fishState = "shaking"
-                    doShake()
+                -- 2. REEL activo - maxima prioridad
+                if isReeling() then
+                    fishState = "reeling"
+                    if fishCfg.reel then
+                        doReel()
+                    end
+                    task.wait(0.05)
+                    return
                 end
-                task.wait(0.15)
-                return
-            end
 
-            -- 5. Lanzar
-            if fishState ~= "casting" then
+                -- 3. Pez capturado
+                if isCaught() then
+                    if not caughtCd then
+                        caughtCd = true
+                        fishState = "caught"
+                        fishStats.catch = fishStats.catch + 1
+                        holdOff()
+                        task.wait(2.5)
+                        caughtCd = false
+                        fishState = "idle"
+                    end
+                    return
+                end
+
+                -- 4. Caña en agua - shake si aparece
+                if isCasting() then
+                    fishState = "waiting"
+                    if fishCfg.shake and isShaking() then
+                        fishState = "shaking"
+                        doShake()
+                    end
+                    task.wait(0.15)
+                    return
+                end
+
+                -- 5. Lanzar
                 fishState = "casting"
                 doCast()
                 fishState = isCasting() and "waiting" or "idle"
-            end
-        end)
+            end)
+
+            task.wait(0.05)
+        end
+        fishState = "idle"
+        holdOff()
     end)
 end
 
 local function stopFish()
-    if fishLoop then fishLoop:Disconnect() fishLoop = nil end
-    fishLoop = nil
     fishCfg.fish = false
+    if fishThread then
+        task.cancel(fishThread)
+        fishThread = nil
+    end
     fishState = "idle"
     holdOff()
 end
@@ -673,9 +673,9 @@ FishStatsLbl.TextSize = 10
 FishStatsLbl.TextXAlignment = Enum.TextXAlignment.Left
 
 local stateColors = {
-    idle="808080", equipping="DCB432",
-    casting="50A0FF", waiting="64C864",
-    shaking="FFA032", reeling="FF5050",
+    idle="808080",     equipping="DCB432",
+    casting="50A0FF",  waiting="64C864",
+    shaking="FFA032",  reeling="FF5050",
     caught="50DC78"
 }
 
@@ -722,10 +722,13 @@ FishResetBtn.Font = Enum.Font.Gotham
 FishResetBtn.TextSize = 11
 FishResetBtn.BorderSizePixel = 0
 Instance.new("UICorner", FishResetBtn).CornerRadius = UDim.new(0, 6)
+-- FIX #6: separar asignaciones en lineas distintas
 local FRStr = Instance.new("UIStroke", FishResetBtn)
-FRStr.Color = GRAY FRStr.Thickness = 1
+FRStr.Color = GRAY
+FRStr.Thickness = 1
 FishResetBtn.MouseButton1Click:Connect(function()
-    fishStats.cast = 0 fishStats.catch = 0
+    fishStats.cast = 0
+    fishStats.catch = 0
 end)
 
 -- SEVERS PAGE
@@ -747,7 +750,8 @@ SevSearchBtn.TextSize = 11
 SevSearchBtn.BorderSizePixel = 0
 Instance.new("UICorner", SevSearchBtn).CornerRadius = UDim.new(0, 6)
 local SSStr = Instance.new("UIStroke", SevSearchBtn)
-SSStr.Color = RED SSStr.Thickness = 1
+SSStr.Color = RED
+SSStr.Thickness = 1
 
 local SevHopBtn = Instance.new("TextButton")
 SevHopBtn.Parent = SeversPage
@@ -761,7 +765,8 @@ SevHopBtn.TextSize = 11
 SevHopBtn.BorderSizePixel = 0
 Instance.new("UICorner", SevHopBtn).CornerRadius = UDim.new(0, 6)
 local SHStr = Instance.new("UIStroke", SevHopBtn)
-SHStr.Color = Color3.fromRGB(60,200,100) SHStr.Thickness = 1
+SHStr.Color = Color3.fromRGB(60,200,100)
+SHStr.Thickness = 1
 
 local SevScroll = Instance.new("ScrollingFrame")
 SevScroll.Parent = SeversPage
@@ -786,9 +791,9 @@ local function clearServers()
 end
 
 local function addServerEntry(server)
-    local p = server.playing or 0
+    local p  = server.playing or 0
     local mx = server.maxPlayers or 1
-    local B = Instance.new("TextButton")
+    local B  = Instance.new("TextButton")
     B.Parent = SevScroll
     B.Size = UDim2.new(1, 0, 0, 26)
     B.BackgroundColor3 = Color3.fromRGB(35, 35, 48)
@@ -799,7 +804,8 @@ local function addServerEntry(server)
     B.BorderSizePixel = 0
     Instance.new("UICorner", B).CornerRadius = UDim.new(0, 5)
     local BS = Instance.new("UIStroke", B)
-    BS.Color = Color3.fromRGB(60,20,20) BS.Thickness = 1
+    BS.Color = Color3.fromRGB(60,20,20)
+    BS.Thickness = 1
     B.MouseButton1Click:Connect(function()
         TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, LP)
     end)
@@ -829,7 +835,10 @@ local function fetchServers()
     end
     table.sort(servers, function(a,b) return a.playing < b.playing end)
     for _, s in pairs(servers) do addServerEntry(s) end
-    SevScroll.CanvasSize = UDim2.new(0,0,0,SevLayout.AbsoluteContentSize.Y+8)
+    -- FIX #4: usar task.defer para que UIListLayout calcule el tamaño primero
+    task.defer(function()
+        SevScroll.CanvasSize = UDim2.new(0, 0, 0, SevLayout.AbsoluteContentSize.Y + 8)
+    end)
     SevSearchBtn.Text = "Buscar ("..#servers..")"
 end
 
@@ -862,7 +871,7 @@ VerLbl.Parent = CfgPage
 VerLbl.Size = UDim2.new(1, -10, 0, 18)
 VerLbl.Position = UDim2.new(0, 6, 0, 32)
 VerLbl.BackgroundTransparency = 1
-VerLbl.Text = "Version: 3.0  |  Hub: NOVACORE"
+VerLbl.Text = "Version: 3.1  |  Hub: NOVACORE"
 VerLbl.TextColor3 = Color3.fromRGB(150,150,150)
 VerLbl.Font = Enum.Font.Gotham
 VerLbl.TextSize = 11
@@ -900,9 +909,11 @@ local MiniStr = Instance.new("UIStroke", MiniLogo)
 MiniStr.Color = RED
 MiniStr.Thickness = 2
 
--- DRAG
-local dragging,dragInput,dragStart,startPos = false,nil,nil,nil
-local miniDrag,miniInput,miniStart,miniPos  = false,nil,nil,nil
+-- DRAG - Main
+local dragging  = false
+local dragInput = nil
+local dragStart = nil
+local startPos  = nil
 
 Header.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
@@ -924,15 +935,24 @@ Header.InputChanged:Connect(function(input)
     end
 end)
 
+-- DRAG - MiniLogo
+-- FIX #5: usar distancia de arrastre para distinguir drag vs click
+local miniDragging  = false
+local miniDragInput = nil
+local miniDragStart = nil
+local miniDragPos   = nil
+local miniMoved     = false  -- flag: se movio suficiente para ser drag real
+
 MiniLogo.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
     or input.UserInputType == Enum.UserInputType.Touch then
-        miniDrag = true
-        miniStart = input.Position
-        miniPos = MiniLogo.Position
+        miniDragging  = true
+        miniMoved     = false
+        miniDragStart = input.Position
+        miniDragPos   = MiniLogo.Position
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
-                miniDrag = false
+                miniDragging = false
             end
         end)
     end
@@ -940,7 +960,7 @@ end)
 MiniLogo.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement
     or input.UserInputType == Enum.UserInputType.Touch then
-        miniInput = input
+        miniDragInput = input
     end
 end)
 
@@ -953,29 +973,38 @@ UIS.InputChanged:Connect(function(input)
                 startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         }):Play()
     end
-    if input == miniInput and miniDrag then
-        local delta = input.Position - miniStart
-        MiniLogo.Position = UDim2.new(
-            miniPos.X.Scale, miniPos.X.Offset + delta.X,
-            miniPos.Y.Scale, miniPos.Y.Offset + delta.Y)
+    if input == miniDragInput and miniDragging and miniDragStart then
+        local delta = input.Position - miniDragStart
+        -- Solo considerar drag si se movio mas de 4px
+        if delta.Magnitude > 4 then
+            miniMoved = true
+            MiniLogo.Position = UDim2.new(
+                miniDragPos.X.Scale, miniDragPos.X.Offset + delta.X,
+                miniDragPos.Y.Scale, miniDragPos.Y.Offset + delta.Y)
+        end
     end
 end)
 
 CloseBtn.MouseButton1Click:Connect(function()
-    Main.Visible = false MiniLogo.Visible = true
+    Main.Visible = false
+    MiniLogo.Visible = true
 end)
 MinBtn.MouseButton1Click:Connect(function()
-    Main.Visible = false MiniLogo.Visible = true
+    Main.Visible = false
+    MiniLogo.Visible = true
 end)
+-- FIX #5: abrir solo si NO fue un drag real
 MiniLogo.MouseButton1Click:Connect(function()
-    if miniDrag then return end
-    Main.Visible = true MiniLogo.Visible = false
+    if miniMoved then
+        miniMoved = false
+        return
+    end
+    Main.Visible = true
+    MiniLogo.Visible = false
 end)
 
 task.defer(function()
     activateTab(HomePage, HomeBtn, HomeInd)
 end)
 
-print("NOVACORE v3.0 cargado - Made BY JO21CX")
-EOF
-wc -l < /mnt/user-data/outputs/novacore_completo.lua
+print("NOVACORE v3.1 cargado - Made BY JO21CX")
