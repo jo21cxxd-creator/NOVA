@@ -507,60 +507,143 @@ local function isCasting()
     return false
 end
 
+local fishState = "idle"
+local reelHolding = false
+
+-- Detectar boton SHAKE en pantalla
+local function getShakeButton()
+    for _, v in pairs(PGui:GetDescendants()) do
+        if v:IsA("TextButton") or v:IsA("ImageButton") then
+            local n = v.Name:lower()
+            local t = (v:IsA("TextButton") and v.Text:lower()) or ""
+            if (n:find("shake") or t:find("shake")) and v.Visible then
+                return v
+            end
+        end
+    end
+    -- Buscar por shakeui
+    local su = PGui:FindFirstChild("shakeui", true)
+    if su and su.Enabled then
+        -- Buscar cualquier boton dentro
+        for _, v in pairs(su:GetDescendants()) do
+            if (v:IsA("TextButton") or v:IsA("ImageButton")) and v.Visible then
+                return v
+            end
+        end
+    end
+    return nil
+end
+
+-- Simular click en boton de forma segura
+local function clickButton(btn)
+    pcall(function()
+        -- Metodo 1: simulacion de input real en el boton
+        local uis = game:GetService("UserInputService")
+        local pos = btn.AbsolutePosition + btn.AbsoluteSize/2
+        -- Fireamos el evento interno del boton
+        btn:SimulateClick()
+    end)
+    pcall(function()
+        -- Metodo 2: VirtualUser en posicion del boton
+        local vu = cloneref(game:GetService("VirtualUser"))
+        local cam = workspace.CurrentCamera
+        local btn2 = btn
+        local pos = btn2.AbsolutePosition + btn2.AbsoluteSize/2
+        vu:Button1Down(pos, cam.CFrame)
+        task.wait(0.05)
+        vu:Button1Up(pos, cam.CFrame)
+    end)
+end
+
+-- Reel: mantener pez dentro de la barra del jugador
+local function doReelLogic()
+    pcall(function()
+        local rg = PGui:FindFirstChild("reel", true)
+        if not rg then fishClick() return end
+
+        local playerbar = rg:FindFirstChild("playerbar", true)
+        local fishFrame  = rg:FindFirstChild("fish", true)
+
+        if not playerbar or not fishFrame then
+            -- Sin referencias exactas: click continuo
+            fishClick()
+            return
+        end
+
+        -- Posicion Y del pez y del jugador
+        local fishY   = fishFrame.AbsolutePosition.Y + fishFrame.AbsoluteSize.Y/2
+        local playerY = playerbar.AbsolutePosition.Y + playerbar.AbsoluteSize.Y/2
+        local barTop  = playerbar.AbsolutePosition.Y
+        local barBot  = barTop + playerbar.AbsoluteSize.Y
+
+        -- Si el pez esta fuera de la barra del jugador, clickear para mover
+        if fishY < barTop or fishY > barBot then
+            fishClick()
+        end
+    end)
+end
+
 local function startFish()
     if fishLoop then fishLoop:Disconnect() fishLoop = nil end
     local ct = 0
-    local last = ""
+    fishState = "idle"
+
     fishLoop = RunService.Heartbeat:Connect(function(dt)
         if not fishCfg.fish then return end
         pcall(function()
-            if not hasRod() then equipRod() task.wait(1) return end
-            if fishCfg.shake and isShaking() then
-                last = "shake"
-                local su = PGui:FindFirstChild("shakeui", true)
-                if su then
-                    local ic = su:FindFirstChild("GamepadIcon", true)
-                    if ic and ic.Parent then
-                        local p = ic.Parent
-                        if p:IsA("TextButton") or p:IsA("ImageButton") then
-                            p.MouseButton1Click:Fire()
-                        else fishClick() end
-                    else fishClick() end
-                else fishClick() end
-                task.wait(0.08)
+            -- 1. Verificar cana equipada
+            if not hasRod() then
+                fishState = "equipping"
+                equipRod()
+                task.wait(1)
                 return
             end
+
+            -- 2. SHAKE - boton circular que aparece antes del minijuego
+            if fishCfg.shake then
+                local shakeBtn = getShakeButton()
+                if shakeBtn then
+                    fishState = "shaking"
+                    clickButton(shakeBtn)
+                    task.wait(0.1)
+                    return
+                end
+            end
+
+            -- 3. REEL - minijuego de la barra
             if fishCfg.reel and isReeling() then
-                last = "reel"
-                local rg = PGui:FindFirstChild("reel", true)
-                if rg then
-                    local pb = rg:FindFirstChild("playerbar", true)
-                    local ff = rg:FindFirstChild("fish", true)
-                    if pb and ff then
-                        if math.abs(pb.AbsolutePosition.Y - ff.AbsolutePosition.Y) > 15 then
-                            fishClick()
-                        end
-                    else fishClick() end
-                else fishClick() end
+                fishState = "reeling"
+                doReelLogic()
                 task.wait(0.05)
                 return
             end
+
+            -- 4. CATCH - pez capturado
             if isCaught() then
-                if last ~= "caught" then
-                    last = "caught"
+                if fishState ~= "caught" then
+                    fishState = "caught"
                     fishStats.catch = fishStats.catch + 1
                 end
-                task.wait(1.5)
+                task.wait(2)
+                fishState = "idle"
                 return
             end
-            if isCasting() then last = "wait" task.wait(0.2) return end
+
+            -- 5. Esperando picada (cana en el agua)
+            if isCasting() then
+                fishState = "waiting"
+                task.wait(0.3)
+                return
+            end
+
+            -- 6. LANZAR
             ct = ct + dt
-            if ct >= 1.5 then
+            if ct >= 2 then
                 ct = 0
-                last = "cast"
+                fishState = "casting"
                 fishClick()
                 fishStats.cast = fishStats.cast + 1
-                task.wait(1)
+                task.wait(1.5)
             end
         end)
     end)
