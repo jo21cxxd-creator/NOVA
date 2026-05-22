@@ -494,9 +494,15 @@ local function isCaught()
 end
 
 local function isCasting()
+    -- bobber MeshPart solo existe cuando la cana esta lanzada
+    -- bobber StringValue existe siempre (es del inventario)
     for _, v in pairs(workspace:GetDescendants()) do
-        local n = v.Name:lower()
-        if n:find("bobber") or n:find("hook") or n:find("float") then return true end
+        if v.Name == "bobber" and v:IsA("MeshPart") then
+            return true
+        end
+        if v.Name == "handlebobber" and v:IsA("RemoteEvent") then
+            return true
+        end
     end
     return false
 end
