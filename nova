@@ -1,32 +1,24 @@
--- ============================================================
--- NOVACORE HUB - COMPLETO (FIXED)
+cat > /mnt/user-data/outputs/novacore_completo.lua << 'EOF'
+-- NOVACORE HUB v3.0
 -- Made BY JO21CX
--- loadstring(game:HttpGet("https://raw.githubusercontent.com/neithantortizgomez2-sys/no/refs/heads/main/Nova"))()
--- ============================================================
+-- loadstring(game:HttpGet("https://raw.githubusercontent.com/jo21cxxd-creator/NOVA/refs/heads/main/nova"))()
 
-local Players        = game:GetService("Players")
-local RunService     = game:GetService("RunService")
-local TweenService   = game:GetService("TweenService")
-local UIS            = game:GetService("UserInputService")
-local TeleportService= game:GetService("TeleportService")
-local HttpService    = game:GetService("HttpService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Players         = game:GetService("Players")
+local RunService      = game:GetService("RunService")
+local TweenService    = game:GetService("TweenService")
+local UIS             = game:GetService("UserInputService")
+local TeleportService = game:GetService("TeleportService")
+local HttpService     = game:GetService("HttpService")
 
 local LP   = Players.LocalPlayer
 local PGui = LP.PlayerGui
 
--- ============================================================
--- COLORES
--- ============================================================
 local RED  = Color3.fromRGB(200, 40, 40)
 local DARK = Color3.fromRGB(28, 28, 34)
 local DARK2= Color3.fromRGB(30, 30, 42)
 local GRAY = Color3.fromRGB(55, 55, 70)
 local WHITE= Color3.fromRGB(220, 220, 220)
 
--- ============================================================
--- SCREEN GUI
--- ============================================================
 local OldGui = PGui:FindFirstChild("NovaCoreHub")
 if OldGui then OldGui:Destroy() end
 
@@ -36,11 +28,7 @@ ScreenGui.Parent = PGui
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 
--- ============================================================
--- MAIN FRAME
--- ============================================================
 local Main = Instance.new("Frame")
-Main.Name = "Main"
 Main.Parent = ScreenGui
 Main.Size = UDim2.new(0, 480, 0, 280)
 Main.Position = UDim2.new(0.5, -240, 0.5, -140)
@@ -53,9 +41,6 @@ local MainStroke = Instance.new("UIStroke", Main)
 MainStroke.Color = RED
 MainStroke.Thickness = 2
 
--- ============================================================
--- HEADER
--- ============================================================
 local Header = Instance.new("Frame")
 Header.Parent = Main
 Header.Size = UDim2.new(1, 0, 0, 36)
@@ -70,7 +55,6 @@ HeaderFix.Size = UDim2.new(1, 0, 0.5, 0)
 HeaderFix.Position = UDim2.new(0, 0, 0.5, 0)
 HeaderFix.BackgroundColor3 = Color3.fromRGB(20, 20, 26)
 HeaderFix.BorderSizePixel = 0
-HeaderFix.ZIndex = 1
 
 local HeaderTitle = Instance.new("TextLabel")
 HeaderTitle.Parent = Header
@@ -110,9 +94,6 @@ MinBtn.BorderSizePixel = 0
 MinBtn.ZIndex = 4
 Instance.new("UICorner", MinBtn).CornerRadius = UDim.new(0, 5)
 
--- ============================================================
--- SIDEBAR
--- ============================================================
 local Sidebar = Instance.new("Frame")
 Sidebar.Parent = Main
 Sidebar.Size = UDim2.new(0, 110, 1, -36)
@@ -120,14 +101,13 @@ Sidebar.Position = UDim2.new(0, 0, 0, 36)
 Sidebar.BackgroundColor3 = Color3.fromRGB(20, 20, 26)
 Sidebar.BorderSizePixel = 0
 Sidebar.ZIndex = 2
+Instance.new("UICorner", Sidebar).CornerRadius = UDim.new(0, 12)
 
 local SideTopFix = Instance.new("Frame")
 SideTopFix.Parent = Sidebar
 SideTopFix.Size = UDim2.new(1, 0, 0, 8)
 SideTopFix.BackgroundColor3 = Color3.fromRGB(20, 20, 26)
 SideTopFix.BorderSizePixel = 0
-
-Instance.new("UICorner", Sidebar).CornerRadius = UDim.new(0, 12)
 
 local SideLayout = Instance.new("UIListLayout")
 SideLayout.Parent = Sidebar
@@ -140,18 +120,12 @@ SidePad.PaddingTop = UDim.new(0, 10)
 SidePad.PaddingLeft = UDim.new(0, 6)
 SidePad.PaddingRight = UDim.new(0, 6)
 
--- ============================================================
--- CONTENT AREA
--- ============================================================
 local Content = Instance.new("Frame")
 Content.Parent = Main
 Content.Size = UDim2.new(1, -118, 1, -44)
 Content.Position = UDim2.new(0, 114, 0, 40)
 Content.BackgroundTransparency = 1
 
--- ============================================================
--- MADE BY + BRAND
--- ============================================================
 local MadeBy = Instance.new("TextLabel")
 MadeBy.Parent = Main
 MadeBy.Size = UDim2.new(0, 110, 0, 18)
@@ -175,13 +149,10 @@ Brand.TextSize = 14
 Brand.TextXAlignment = Enum.TextXAlignment.Right
 Brand.ZIndex = 4
 
--- ============================================================
--- SISTEMA DE TABS
--- ============================================================
-local tabPages   = {}
+-- TABS
+local tabPages = {}
 local tabButtons = {}
 
--- FIX 1: Funcion interna para activar un tab sin depender de :Fire()
 local function activateTab(Page, Btn, Ind)
     for _, p in pairs(tabPages) do p.Visible = false end
     for _, t in pairs(tabButtons) do
@@ -239,9 +210,7 @@ local SeversBtn, SeversPage, SeversInd = createTab("Severs")
 local ShopBtn,   ShopPage,   ShopInd   = createTab("Shop")
 local CfgBtn,    CfgPage,    CfgInd    = createTab("Config")
 
--- ============================================================
--- HELPER: TOGGLE
--- ============================================================
+-- TOGGLE HELPER
 local function makeToggle(parent, label, posY, default, onOn, onOff)
     local Row = Instance.new("Frame")
     Row.Parent = parent
@@ -282,7 +251,6 @@ local function makeToggle(parent, label, posY, default, onOn, onOff)
     Instance.new("UICorner", Knob).CornerRadius = UDim.new(1, 0)
 
     local state = default or false
-
     local function apply(val)
         state = val
         if val then
@@ -303,7 +271,6 @@ local function makeToggle(parent, label, posY, default, onOn, onOff)
             if onOff then pcall(onOff) end
         end
     end
-
     apply(state)
 
     local Hit = Instance.new("TextButton")
@@ -313,13 +280,9 @@ local function makeToggle(parent, label, posY, default, onOn, onOff)
     Hit.Text = ""
     Hit.ZIndex = 3
     Hit.MouseButton1Click:Connect(function() apply(not state) end)
-
     return apply
 end
 
--- ============================================================
--- HELPER: LABEL SECCION
--- ============================================================
 local function sectionLabel(parent, text, posY)
     local L = Instance.new("TextLabel")
     L.Parent = parent
@@ -344,9 +307,7 @@ local function divLine(parent, posY)
     return D
 end
 
--- ============================================================
 -- HOME PAGE
--- ============================================================
 sectionLabel(HomePage, "Bienvenido", 4)
 divLine(HomePage, 24)
 
@@ -372,18 +333,6 @@ TimeLbl.Font = Enum.Font.Gotham
 TimeLbl.TextSize = 11
 TimeLbl.TextXAlignment = Enum.TextXAlignment.Left
 
-local RachaLbl = Instance.new("TextLabel")
-RachaLbl.Parent = HomePage
-RachaLbl.Size = UDim2.new(0.65, 0, 0, 20)
-RachaLbl.Position = UDim2.new(0, 6, 0, 80)
-RachaLbl.BackgroundTransparency = 1
-RachaLbl.Text = "Racha de uso:  1 dia"
-RachaLbl.TextColor3 = Color3.fromRGB(180, 180, 180)
-RachaLbl.Font = Enum.Font.Gotham
-RachaLbl.TextSize = 11
-RachaLbl.TextXAlignment = Enum.TextXAlignment.Left
-
--- Avatar
 local Avatar = Instance.new("ImageLabel")
 Avatar.Parent = HomePage
 Avatar.Size = UDim2.new(0, 68, 0, 68)
@@ -397,32 +346,24 @@ AvStroke.Color = RED
 AvStroke.Thickness = 2
 
 pcall(function()
-    local thumb = Players:GetUserThumbnailAsync(
-        LP.UserId,
-        Enum.ThumbnailType.HeadShot,
-        Enum.ThumbnailSize.Size420x420
-    )
-    Avatar.Image = thumb
+    Avatar.Image = Players:GetUserThumbnailAsync(
+        LP.UserId, Enum.ThumbnailType.HeadShot, Enum.ThumbnailSize.Size420x420)
 end)
 
--- FIX 4: Timer con throttle — actualiza cada segundo en vez de cada frame
 local startTime = tick()
-local timerAccum = 0
+local tacc = 0
 RunService.Heartbeat:Connect(function(dt)
-    timerAccum = timerAccum + dt
-    if timerAccum >= 1 then
-        timerAccum = 0
+    tacc = tacc + dt
+    if tacc >= 1 then
+        tacc = 0
         pcall(function()
             local e = tick() - startTime
-            local h = math.floor(e / 3600)
-            local m = math.floor((e % 3600) / 60)
-            local s = math.floor(e % 60)
-            TimeLbl.Text = string.format("Tiempo de uso:  %02d:%02d:%02d", h, m, s)
+            TimeLbl.Text = string.format("Tiempo de uso:  %02d:%02d:%02d",
+                math.floor(e/3600), math.floor((e%3600)/60), math.floor(e%60))
         end)
     end
 end)
 
--- Discord
 divLine(HomePage, 108)
 local DiscBtn = Instance.new("TextButton")
 DiscBtn.Parent = HomePage
@@ -435,7 +376,6 @@ DiscBtn.Font = Enum.Font.GothamBold
 DiscBtn.TextSize = 12
 DiscBtn.BorderSizePixel = 0
 Instance.new("UICorner", DiscBtn).CornerRadius = UDim.new(0, 6)
-
 DiscBtn.MouseButton1Click:Connect(function()
     pcall(setclipboard, "discord.gg/novacore")
     DiscBtn.Text = "Link copiado!"
@@ -444,54 +384,178 @@ DiscBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ============================================================
--- FISCH PAGE
+-- FISCH v3 - PATHS EXACTOS
+-- SHAKE: PlayerGui.shakeui.safezone.button (ImageButton)
+-- REEL:  PlayerGui.reel.bar.modal (TextButton - hold/release)
+--        PlayerGui.reel.bar.fish (Frame - posicion pez)
+--        PlayerGui.reel.bar.playerbar (Frame - posicion jugador)
 -- ============================================================
 local fishCfg = {fish=false, shake=false, reel=false}
 local fishStats = {cast=0, catch=0}
 local fishLoop = nil
+local fishState = "idle"
+local isHolding = false
 
--- FIX 2: clickButton reescrito — sin SimulateClick() que no existe en Luau
-local function fishClick()
+local function getVU()
+    if cloneref then return cloneref(game:GetService("VirtualUser")) end
+    return game:GetService("VirtualUser")
+end
+
+local function vuDown()
     pcall(function()
         local cam = workspace.CurrentCamera
-        local center = Vector2.new(cam.ViewportSize.X / 2, cam.ViewportSize.Y / 2)
-        -- FIX 3: cloneref solo si existe (no todos los executors lo tienen)
-        local vu
-        if cloneref then
-            vu = cloneref(game:GetService("VirtualUser"))
-        else
-            vu = game:GetService("VirtualUser")
-        end
-        vu:Button1Down(center, cam.CFrame)
-        task.wait(0.05)
-        vu:Button1Up(center, cam.CFrame)
+        local c = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
+        getVU():Button1Down(c, cam.CFrame)
     end)
 end
 
-local function clickButton(btn)
+local function vuUp()
     pcall(function()
-        -- Metodo 1: click en la posicion central del boton con VirtualUser
         local cam = workspace.CurrentCamera
-        local pos = btn.AbsolutePosition + btn.AbsoluteSize / 2
-        local vu
-        if cloneref then
-            vu = cloneref(game:GetService("VirtualUser"))
-        else
-            vu = game:GetService("VirtualUser")
-        end
-        vu:Button1Down(pos, cam.CFrame)
-        task.wait(0.05)
-        vu:Button1Up(pos, cam.CFrame)
+        local c = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
+        getVU():Button1Up(c, cam.CFrame)
     end)
 end
 
+local function clickAt(pos)
+    pcall(function()
+        local cam = workspace.CurrentCamera
+        getVU():Button1Down(pos, cam.CFrame)
+        task.wait(0.05)
+        getVU():Button1Up(pos, cam.CFrame)
+    end)
+end
+
+local function holdOn()
+    if not isHolding then
+        isHolding = true
+        vuDown()
+    end
+end
+
+local function holdOff()
+    if isHolding then
+        isHolding = false
+        vuUp()
+    end
+end
+
+-- Detectar caña lanzada: bobber MeshPart en workspace
+local function isCasting()
+    for _, v in pairs(workspace:GetDescendants()) do
+        if v.Name == "bobber" and v:IsA("MeshPart") then
+            return true
+        end
+    end
+    return false
+end
+
+-- Detectar shake: shakeui habilitado con safezone visible
+local function isShaking()
+    local shakeui = PGui:FindFirstChild("shakeui")
+    return shakeui ~= nil and shakeui.Enabled == true
+end
+
+-- Detectar reel: reel ScreenGui habilitado
+local function isReeling()
+    local reel = PGui:FindFirstChild("reel")
+    return reel ~= nil and reel.Enabled == true
+end
+
+-- Detectar captura exitosa
+local function isCaught()
+    local catchGui = PGui:FindFirstChild("catch")
+    if catchGui then return true end
+    -- fallback: reel desaparece y fish frame aparece con resultado
+    return false
+end
+
+-- SHAKE: clickear el ImageButton exacto
+-- PATH: shakeui.safezone.button
+local function doShake()
+    pcall(function()
+        local shakeui = PGui:FindFirstChild("shakeui")
+        if not shakeui then return end
+        local safezone = shakeui:FindFirstChild("safezone")
+        if not safezone then return end
+        local button = safezone:FindFirstChild("button")
+        if not button or not button.Visible then return end
+        -- Clickear en la posicion del boton
+        local pos = button.AbsolutePosition + button.AbsoluteSize/2
+        clickAt(pos)
+    end)
+end
+
+-- REEL: hold/release segun posicion pez vs playerbar
+-- PATH: reel.bar.fish y reel.bar.playerbar
+-- modal es el boton que controla el hold
+local function doReel()
+    pcall(function()
+        local reel = PGui:FindFirstChild("reel")
+        if not reel then
+            -- fallback oscilacion
+            holdOn() task.wait(0.06) holdOff() task.wait(0.06)
+            return
+        end
+
+        local bar = reel:FindFirstChild("bar")
+        if not bar then
+            holdOn() task.wait(0.06) holdOff() task.wait(0.06)
+            return
+        end
+
+        local fishFrame   = bar:FindFirstChild("fish")
+        local playerbar   = bar:FindFirstChild("playerbar")
+
+        if not fishFrame or not playerbar then
+            holdOn() task.wait(0.06) holdOff() task.wait(0.06)
+            return
+        end
+
+        -- Posicion X del pez (indicador que se mueve)
+        local fishX    = fishFrame.AbsolutePosition.X + fishFrame.AbsoluteSize.X/2
+        -- Zona del playerbar (rectangulo blanco donde debe estar el pez)
+        local pbLeft   = playerbar.AbsolutePosition.X
+        local pbRight  = pbLeft + playerbar.AbsoluteSize.X
+        local pbCenter = pbLeft + playerbar.AbsoluteSize.X/2
+        local margin   = 6
+
+        -- Si el pez esta a la izquierda del playerbar: HOLD (mueve derecha)
+        -- Si el pez esta a la derecha del playerbar: RELEASE (mueve izquierda)
+        -- Si esta dentro: mantener centrado
+        if fishX < pbLeft + margin then
+            holdOn()
+        elseif fishX > pbRight - margin then
+            holdOff()
+        elseif fishX < pbCenter then
+            holdOn()
+        else
+            holdOff()
+        end
+    end)
+end
+
+-- CAST: mantener click para llenar barra de poder, soltar
+local function doCast()
+    pcall(function()
+        holdOn()
+        task.wait(0.9)
+        holdOff()
+        task.wait(1.5)
+        fishStats.cast = fishStats.cast + 1
+    end)
+end
+
+-- ROD
 local function hasRod()
     local ch = LP.Character
     if not ch then return false end
     for _, v in pairs(ch:GetChildren()) do
         if v:IsA("Tool") then
             local n = v.Name:lower()
-            if n:find("rod") or n:find("fish") then return true end
+            if n:find("rod") or n:find("fish") or n:find("cana") then
+                return true
+            end
         end
     end
     return false
@@ -511,134 +575,64 @@ local function equipRod()
     end)
 end
 
-local function isShaking()
-    local s = PGui:FindFirstChild("shakeui", true)
-    return s ~= nil and s.Enabled == true
-end
-
-local function isReeling()
-    local r = PGui:FindFirstChild("reel", true)
-    return r ~= nil and r.Enabled == true
-end
-
-local function isCaught()
-    local c = PGui:FindFirstChild("catch", true)
-    return c ~= nil and c.Visible == true
-end
-
-local function isCasting()
-    for _, v in pairs(workspace:GetDescendants()) do
-        if v.Name == "bobber" and v:IsA("MeshPart") then
-            return true
-        end
-        if v.Name == "handlebobber" and v:IsA("RemoteEvent") then
-            return true
-        end
-    end
-    return false
-end
-
-local fishState = "idle"
-
-local function getShakeButton()
-    for _, v in pairs(PGui:GetDescendants()) do
-        if v:IsA("TextButton") or v:IsA("ImageButton") then
-            local n = v.Name:lower()
-            local t = (v:IsA("TextButton") and v.Text:lower()) or ""
-            if (n:find("shake") or t:find("shake")) and v.Visible then
-                return v
-            end
-        end
-    end
-    local su = PGui:FindFirstChild("shakeui", true)
-    if su and su.Enabled then
-        for _, v in pairs(su:GetDescendants()) do
-            if (v:IsA("TextButton") or v:IsA("ImageButton")) and v.Visible then
-                return v
-            end
-        end
-    end
-    return nil
-end
-
-local function doReelLogic()
-    pcall(function()
-        local rg = PGui:FindFirstChild("reel", true)
-        if not rg then fishClick() return end
-
-        local playerbar = rg:FindFirstChild("playerbar", true)
-        local fishFrame  = rg:FindFirstChild("fish", true)
-
-        if not playerbar or not fishFrame then
-            fishClick()
-            return
-        end
-
-        local fishY   = fishFrame.AbsolutePosition.Y + fishFrame.AbsoluteSize.Y / 2
-        local barTop  = playerbar.AbsolutePosition.Y
-        local barBot  = barTop + playerbar.AbsoluteSize.Y
-
-        if fishY < barTop or fishY > barBot then
-            fishClick()
-        end
-    end)
-end
+local caughtCd = false
 
 local function startFish()
     if fishLoop then fishLoop:Disconnect() fishLoop = nil end
-    local ct = 0
     fishState = "idle"
+    holdOff()
 
-    fishLoop = RunService.Heartbeat:Connect(function(dt)
-        if not fishCfg.fish then return end
+    fishLoop = RunService.Heartbeat:Connect(function()
+        if not fishCfg.fish then holdOff() return end
         pcall(function()
+            -- 1. Caña equipada
             if not hasRod() then
                 fishState = "equipping"
+                holdOff()
                 equipRod()
-                task.wait(1)
                 return
             end
 
-            if fishCfg.shake then
-                local shakeBtn = getShakeButton()
-                if shakeBtn then
-                    fishState = "shaking"
-                    clickButton(shakeBtn)
-                    task.wait(0.1)
-                    return
-                end
-            end
-
-            if fishCfg.reel and isReeling() then
+            -- 2. REEL activo - maxima prioridad
+            if isReeling() then
                 fishState = "reeling"
-                doReelLogic()
+                if fishCfg.reel then
+                    doReel()
+                end
                 task.wait(0.05)
                 return
             end
 
+            -- 3. Pez capturado
             if isCaught() then
-                if fishState ~= "caught" then
+                if not caughtCd then
+                    caughtCd = true
                     fishState = "caught"
                     fishStats.catch = fishStats.catch + 1
+                    holdOff()
+                    task.wait(2.5)
+                    caughtCd = false
+                    fishState = "idle"
                 end
-                task.wait(2)
-                fishState = "idle"
                 return
             end
 
+            -- 4. Caña en agua - shake si aparece
             if isCasting() then
                 fishState = "waiting"
-                task.wait(0.3)
+                if fishCfg.shake and isShaking() then
+                    fishState = "shaking"
+                    doShake()
+                end
+                task.wait(0.15)
                 return
             end
 
-            ct = ct + dt
-            if ct >= 2 then
-                ct = 0
+            -- 5. Lanzar
+            if fishState ~= "casting" then
                 fishState = "casting"
-                fishClick()
-                fishStats.cast = fishStats.cast + 1
-                task.wait(1.5)
+                doCast()
+                fishState = isCasting() and "waiting" or "idle"
             end
         end)
     end)
@@ -646,71 +640,95 @@ end
 
 local function stopFish()
     if fishLoop then fishLoop:Disconnect() fishLoop = nil end
+    fishLoop = nil
     fishCfg.fish = false
+    fishState = "idle"
+    holdOff()
 end
 
+-- FISCH PAGE UI
 sectionLabel(FischPage, "Fisch Tools", 4)
 divLine(FischPage, 24)
 
+local FishStateLbl = Instance.new("TextLabel")
+FishStateLbl.Parent = FischPage
+FishStateLbl.Size = UDim2.new(1, -10, 0, 13)
+FishStateLbl.Position = UDim2.new(0, 6, 0, 28)
+FishStateLbl.BackgroundTransparency = 1
+FishStateLbl.Text = "Estado: inactivo"
+FishStateLbl.TextColor3 = Color3.fromRGB(130,130,130)
+FishStateLbl.Font = Enum.Font.Gotham
+FishStateLbl.TextSize = 10
+FishStateLbl.TextXAlignment = Enum.TextXAlignment.Left
+
 local FishStatsLbl = Instance.new("TextLabel")
 FishStatsLbl.Parent = FischPage
-FishStatsLbl.Size = UDim2.new(1, -10, 0, 14)
-FishStatsLbl.Position = UDim2.new(0, 6, 0, 28)
+FishStatsLbl.Size = UDim2.new(1, -10, 0, 13)
+FishStatsLbl.Position = UDim2.new(0, 6, 0, 42)
 FishStatsLbl.BackgroundTransparency = 1
 FishStatsLbl.Text = "Cast: 0  |  Catch: 0"
-FishStatsLbl.TextColor3 = Color3.fromRGB(130, 130, 130)
+FishStatsLbl.TextColor3 = Color3.fromRGB(130,130,130)
 FishStatsLbl.Font = Enum.Font.Gotham
 FishStatsLbl.TextSize = 10
 FishStatsLbl.TextXAlignment = Enum.TextXAlignment.Left
 
--- FIX 4: Stats label con throttle — actualiza cada 2 segundos, no cada frame
-local statsAccum = 0
+local stateColors = {
+    idle="808080", equipping="DCB432",
+    casting="50A0FF", waiting="64C864",
+    shaking="FFA032", reeling="FF5050",
+    caught="50DC78"
+}
+
+local sacc = 0
 RunService.Heartbeat:Connect(function(dt)
-    statsAccum = statsAccum + dt
-    if statsAccum >= 2 then
-        statsAccum = 0
+    sacc = sacc + dt
+    if sacc >= 0.5 then
+        sacc = 0
         pcall(function()
-            FishStatsLbl.Text = "Cast: " .. fishStats.cast .. "  |  Catch: " .. fishStats.catch
+            FishStatsLbl.Text = "Cast: "..fishStats.cast.."  |  Catch: "..fishStats.catch
+            FishStateLbl.Text = "Estado: "..fishState
+            local col = stateColors[fishState]
+            if col then
+                local r = tonumber(col:sub(1,2),16)/255
+                local g = tonumber(col:sub(3,4),16)/255
+                local b = tonumber(col:sub(5,6),16)/255
+                FishStateLbl.TextColor3 = Color3.new(r,g,b)
+            end
         end)
     end
 end)
 
-makeToggle(FischPage, "Auto Pescar",  48, false,
-    function() fishCfg.fish = true startFish() end,
+makeToggle(FischPage, "Auto Pescar", 60, false,
+    function() fishCfg.fish=true startFish() end,
     function() stopFish() end
 )
-makeToggle(FischPage, "Auto Shake",   84, false,
-    function() fishCfg.shake = true end,
-    function() fishCfg.shake = false end
+makeToggle(FischPage, "Auto Shake", 96, false,
+    function() fishCfg.shake=true end,
+    function() fishCfg.shake=false end
 )
-makeToggle(FischPage, "Auto Reel",   120, false,
-    function() fishCfg.reel = true end,
-    function() fishCfg.reel = false end
+makeToggle(FischPage, "Auto Reel", 132, false,
+    function() fishCfg.reel=true end,
+    function() fishCfg.reel=false end
 )
 
 local FishResetBtn = Instance.new("TextButton")
 FishResetBtn.Parent = FischPage
 FishResetBtn.Size = UDim2.new(1, -12, 0, 24)
-FishResetBtn.Position = UDim2.new(0, 6, 0, 158)
+FishResetBtn.Position = UDim2.new(0, 6, 0, 170)
 FishResetBtn.BackgroundColor3 = DARK2
 FishResetBtn.Text = "Reset Stats"
-FishResetBtn.TextColor3 = Color3.fromRGB(160, 160, 160)
+FishResetBtn.TextColor3 = Color3.fromRGB(160,160,160)
 FishResetBtn.Font = Enum.Font.Gotham
 FishResetBtn.TextSize = 11
 FishResetBtn.BorderSizePixel = 0
 Instance.new("UICorner", FishResetBtn).CornerRadius = UDim.new(0, 6)
 local FRStr = Instance.new("UIStroke", FishResetBtn)
-FRStr.Color = GRAY
-FRStr.Thickness = 1
+FRStr.Color = GRAY FRStr.Thickness = 1
 FishResetBtn.MouseButton1Click:Connect(function()
-    fishStats.cast = 0
-    fishStats.catch = 0
-    FishStatsLbl.Text = "Cast: 0  |  Catch: 0"
+    fishStats.cast = 0 fishStats.catch = 0
 end)
 
--- ============================================================
 -- SEVERS PAGE
--- ============================================================
 sectionLabel(SeversPage, "Server Hop", 4)
 divLine(SeversPage, 24)
 
@@ -729,8 +747,7 @@ SevSearchBtn.TextSize = 11
 SevSearchBtn.BorderSizePixel = 0
 Instance.new("UICorner", SevSearchBtn).CornerRadius = UDim.new(0, 6)
 local SSStr = Instance.new("UIStroke", SevSearchBtn)
-SSStr.Color = RED
-SSStr.Thickness = 1
+SSStr.Color = RED SSStr.Thickness = 1
 
 local SevHopBtn = Instance.new("TextButton")
 SevHopBtn.Parent = SeversPage
@@ -744,8 +761,7 @@ SevHopBtn.TextSize = 11
 SevHopBtn.BorderSizePixel = 0
 Instance.new("UICorner", SevHopBtn).CornerRadius = UDim.new(0, 6)
 local SHStr = Instance.new("UIStroke", SevHopBtn)
-SHStr.Color = Color3.fromRGB(60, 200, 100)
-SHStr.Thickness = 1
+SHStr.Color = Color3.fromRGB(60,200,100) SHStr.Thickness = 1
 
 local SevScroll = Instance.new("ScrollingFrame")
 SevScroll.Parent = SeversPage
@@ -783,8 +799,7 @@ local function addServerEntry(server)
     B.BorderSizePixel = 0
     Instance.new("UICorner", B).CornerRadius = UDim.new(0, 5)
     local BS = Instance.new("UIStroke", B)
-    BS.Color = Color3.fromRGB(60, 20, 20)
-    BS.Thickness = 1
+    BS.Color = Color3.fromRGB(60,20,20) BS.Thickness = 1
     B.MouseButton1Click:Connect(function()
         TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, LP)
     end)
@@ -812,9 +827,9 @@ local function fetchServers()
             if not cursor then break end
         end
     end
-    table.sort(servers, function(a, b) return a.playing < b.playing end)
+    table.sort(servers, function(a,b) return a.playing < b.playing end)
     for _, s in pairs(servers) do addServerEntry(s) end
-    SevScroll.CanvasSize = UDim2.new(0, 0, 0, SevLayout.AbsoluteContentSize.Y + 8)
+    SevScroll.CanvasSize = UDim2.new(0,0,0,SevLayout.AbsoluteContentSize.Y+8)
     SevSearchBtn.Text = "Buscar ("..#servers..")"
 end
 
@@ -824,9 +839,7 @@ SevHopBtn.MouseButton1Click:Connect(function()
     TeleportService:TeleportToPlaceInstance(game.PlaceId, servers[1].id, LP)
 end)
 
--- ============================================================
 -- SHOP PAGE
--- ============================================================
 sectionLabel(ShopPage, "Tienda", 4)
 divLine(ShopPage, 24)
 local ShopInfo = Instance.new("TextLabel")
@@ -835,14 +848,12 @@ ShopInfo.Size = UDim2.new(1, -10, 0, 20)
 ShopInfo.Position = UDim2.new(0, 6, 0, 32)
 ShopInfo.BackgroundTransparency = 1
 ShopInfo.Text = "Proximamente..."
-ShopInfo.TextColor3 = Color3.fromRGB(150, 150, 150)
+ShopInfo.TextColor3 = Color3.fromRGB(150,150,150)
 ShopInfo.Font = Enum.Font.Gotham
 ShopInfo.TextSize = 12
 ShopInfo.TextXAlignment = Enum.TextXAlignment.Left
 
--- ============================================================
 -- CONFIG PAGE
--- ============================================================
 sectionLabel(CfgPage, "Configuracion", 4)
 divLine(CfgPage, 24)
 
@@ -851,8 +862,8 @@ VerLbl.Parent = CfgPage
 VerLbl.Size = UDim2.new(1, -10, 0, 18)
 VerLbl.Position = UDim2.new(0, 6, 0, 32)
 VerLbl.BackgroundTransparency = 1
-VerLbl.Text = "Version: 1.0  |  Hub: NOVACORE"
-VerLbl.TextColor3 = Color3.fromRGB(150, 150, 150)
+VerLbl.Text = "Version: 3.0  |  Hub: NOVACORE"
+VerLbl.TextColor3 = Color3.fromRGB(150,150,150)
 VerLbl.Font = Enum.Font.Gotham
 VerLbl.TextSize = 11
 VerLbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -862,7 +873,7 @@ ExecLbl.Parent = CfgPage
 ExecLbl.Size = UDim2.new(1, -10, 0, 18)
 ExecLbl.Position = UDim2.new(0, 6, 0, 54)
 ExecLbl.BackgroundTransparency = 1
-ExecLbl.TextColor3 = Color3.fromRGB(150, 150, 150)
+ExecLbl.TextColor3 = Color3.fromRGB(150,150,150)
 ExecLbl.Font = Enum.Font.Gotham
 ExecLbl.TextSize = 11
 ExecLbl.TextXAlignment = Enum.TextXAlignment.Left
@@ -871,9 +882,7 @@ pcall(function()
     ExecLbl.Text = "Executor: "..name
 end)
 
--- ============================================================
 -- MINI LOGO
--- ============================================================
 local MiniLogo = Instance.new("TextButton")
 MiniLogo.Parent = ScreenGui
 MiniLogo.Size = UDim2.new(0, 50, 0, 50)
@@ -891,11 +900,9 @@ local MiniStr = Instance.new("UIStroke", MiniLogo)
 MiniStr.Color = RED
 MiniStr.Thickness = 2
 
--- ============================================================
 -- DRAG
--- ============================================================
-local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
-local miniDrag, miniInput, miniStart, miniPos = false, nil, nil, nil
+local dragging,dragInput,dragStart,startPos = false,nil,nil,nil
+local miniDrag,miniInput,miniStart,miniPos  = false,nil,nil,nil
 
 Header.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
@@ -910,7 +917,6 @@ Header.InputBegan:Connect(function(input)
         end)
     end
 end)
-
 Header.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement
     or input.UserInputType == Enum.UserInputType.Touch then
@@ -931,7 +937,6 @@ MiniLogo.InputBegan:Connect(function(input)
         end)
     end
 end)
-
 MiniLogo.InputChanged:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseMovement
     or input.UserInputType == Enum.UserInputType.Touch then
@@ -945,43 +950,32 @@ UIS.InputChanged:Connect(function(input)
         TweenService:Create(Main, TweenInfo.new(0.1), {
             Position = UDim2.new(
                 startPos.X.Scale, startPos.X.Offset + delta.X,
-                startPos.Y.Scale, startPos.Y.Offset + delta.Y
-            )
+                startPos.Y.Scale, startPos.Y.Offset + delta.Y)
         }):Play()
     end
     if input == miniInput and miniDrag then
         local delta = input.Position - miniStart
         MiniLogo.Position = UDim2.new(
             miniPos.X.Scale, miniPos.X.Offset + delta.X,
-            miniPos.Y.Scale, miniPos.Y.Offset + delta.Y
-        )
+            miniPos.Y.Scale, miniPos.Y.Offset + delta.Y)
     end
 end)
 
--- ============================================================
--- BOTONES CERRAR / MINIMIZAR
--- ============================================================
 CloseBtn.MouseButton1Click:Connect(function()
-    Main.Visible = false
-    MiniLogo.Visible = true
+    Main.Visible = false MiniLogo.Visible = true
 end)
-
 MinBtn.MouseButton1Click:Connect(function()
-    Main.Visible = false
-    MiniLogo.Visible = true
+    Main.Visible = false MiniLogo.Visible = true
 end)
-
 MiniLogo.MouseButton1Click:Connect(function()
     if miniDrag then return end
-    Main.Visible = true
-    MiniLogo.Visible = false
+    Main.Visible = true MiniLogo.Visible = false
 end)
 
--- ============================================================
--- FIX 1: Activar HOME por defecto sin usar :Fire()
--- ============================================================
 task.defer(function()
     activateTab(HomePage, HomeBtn, HomeInd)
 end)
 
-print("NOVACORE Hub cargado - Made BY JO21CX")
+print("NOVACORE v3.0 cargado - Made BY JO21CX")
+EOF
+wc -l < /mnt/user-data/outputs/novacore_completo.lua
