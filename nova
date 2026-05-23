@@ -206,7 +206,7 @@ end
 
 local HomeBtn,   HomePage,   HomeInd   = createTab("Home")
 local FischBtn,  FischPage,  FischInd  = createTab("Fisch")
-local SeversBtn, SeversPage, SeversInd = createTab("Severs")
+local ServersBtn, ServersPage, ServersInd = createTab("Servers") -- Corregido
 local ShopBtn,   ShopPage,   ShopInd   = createTab("Shop")
 local CfgBtn,    CfgPage,    CfgInd    = createTab("Config")
 
@@ -386,10 +386,6 @@ end)
 -- ============================================================
 -- FISCH v3.3
 -- FIX PRINCIPAL: blacklist de tools que NO son caña
--- Bloquea Equipment Bag, radares, barriles y cualquier
--- accesorio/bolsa que contenga "bag", "equip", "barrel",
--- "radar", "admin" en el nombre — nunca los equipa.
--- La caña se detecta por el bobber en workspace.
 -- ============================================================
 
 local fishCfg   = {fish=false, shake=false, reel=false}
@@ -398,10 +394,6 @@ local fishThread = nil
 local fishState  = "idle"
 local isHolding  = false
 
--- ============================================================
--- BLACKLIST: nombres (o fragmentos) de tools que NUNCA
--- deben equiparse aunque tengan partes de caña adentro
--- ============================================================
 local TOOL_BLACKLIST = {
     "bag", "equip", "equipment",
     "barrel", "admin", "radar",
@@ -420,7 +412,6 @@ local function isBlacklisted(toolName)
     return false
 end
 
--- Palabras clave internas que identifican una caña
 local ROD_PART_KEYWORDS = {
     "line", "string", "hook",
     "reel", "fishing", "float",
@@ -440,16 +431,12 @@ local function toolHasRodParts(tool)
     return false
 end
 
--- Un tool es una caña solo si:
---   1. NO esta en la blacklist
---   2. Tiene partes internas de caña (hilo, gancho, etc.)
 local function isRod(tool)
     if not tool:IsA("Tool") then return false end
     if isBlacklisted(tool.Name) then return false end
     return toolHasRodParts(tool)
 end
 
--- FIX: getVU con fallback seguro
 local function getVU()
     local ok, vu = pcall(function()
         return cloneref(game:GetService("VirtualUser"))
@@ -759,15 +746,15 @@ FishResetBtn.MouseButton1Click:Connect(function()
     fishStats.catch = 0
 end)
 
--- SEVERS PAGE
-sectionLabel(SeversPage, "Server Hop", 4)
-divLine(SeversPage, 24)
+-- SEVERS PAGE (corregido a Servers)
+sectionLabel(ServersPage, "Server Hop", 4)
+divLine(ServersPage, 24)
 
 local servers    = {}
 local currentJob = game.JobId
 
 local SevSearchBtn = Instance.new("TextButton")
-SevSearchBtn.Parent = SeversPage
+SevSearchBtn.Parent = ServersPage
 SevSearchBtn.Size = UDim2.new(0.48, -4, 0, 26)
 SevSearchBtn.Position = UDim2.new(0, 6, 0, 30)
 SevSearchBtn.BackgroundColor3 = DARK2
@@ -782,7 +769,7 @@ SSStr.Color = RED
 SSStr.Thickness = 1
 
 local SevHopBtn = Instance.new("TextButton")
-SevHopBtn.Parent = SeversPage
+SevHopBtn.Parent = ServersPage
 SevHopBtn.Size = UDim2.new(0.48, -4, 0, 26)
 SevHopBtn.Position = UDim2.new(0.52, 2, 0, 30)
 SevHopBtn.BackgroundColor3 = DARK2
@@ -797,7 +784,7 @@ SHStr.Color = Color3.fromRGB(60,200,100)
 SHStr.Thickness = 1
 
 local SevScroll = Instance.new("ScrollingFrame")
-SevScroll.Parent = SeversPage
+SevScroll.Parent = ServersPage
 SevScroll.Size = UDim2.new(1, -12, 1, -68)
 SevScroll.Position = UDim2.new(0, 6, 0, 62)
 SevScroll.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
@@ -1033,4 +1020,5 @@ end)
 
 print("NOVACORE v3.3 cargado - Made BY JO21CX")
 ENDOFSCRIPT
+
 echo "OK: $(wc -l < /mnt/user-data/outputs/novacore_v3_3.lua) lineas"
