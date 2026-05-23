@@ -1,4 +1,4 @@
--- NOVACORE HUB v3.9
+-- NOVACORE HUB v4.1
 -- Made BY JO21CX
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/jo21cxxd-creator/NOVA/refs/heads/main/nova"))()
 
@@ -419,18 +419,18 @@ local function isRod(tool)
     return false
 end
 
-local function getVU()
-    local ok, vu = pcall(function()
-        return cloneref(game:GetService("VirtualUser"))
-    end)
-    return (ok and vu) or game:GetService("VirtualUser")
-end
+-- ============================================================
+-- INPUT v4.0 — VirtualInputManager en vez de VirtualUser
+-- VirtualUser no funciona en movil para iniciar el casteo
+-- VirtualInputManager:SendMouseButtonEvent si funciona
+-- ============================================================
+local VIM = game:GetService("VirtualInputManager")
 
 local function vuDown()
     pcall(function()
         local cam = workspace.CurrentCamera
         local c = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
-        getVU():Button1Down(c, cam.CFrame)
+        VIM:SendMouseButtonEvent(c.X, c.Y, 0, true, game, 0)
     end)
 end
 
@@ -438,16 +438,15 @@ local function vuUp()
     pcall(function()
         local cam = workspace.CurrentCamera
         local c = Vector2.new(cam.ViewportSize.X/2, cam.ViewportSize.Y/2)
-        getVU():Button1Up(c, cam.CFrame)
+        VIM:SendMouseButtonEvent(c.X, c.Y, 0, false, game, 0)
     end)
 end
 
 local function clickAt(pos)
     pcall(function()
-        local cam = workspace.CurrentCamera
-        getVU():Button1Down(pos, cam.CFrame)
+        VIM:SendMouseButtonEvent(pos.X, pos.Y, 0, true, game, 0)
         task.wait(0.05)
-        getVU():Button1Up(pos, cam.CFrame)
+        VIM:SendMouseButtonEvent(pos.X, pos.Y, 0, false, game, 0)
     end)
 end
 
@@ -482,20 +481,34 @@ local function hasRod()
     return false
 end
 
--- equipRod v3.8 — equipa automaticamente la primera caña
--- detectada por estructura interna, sin importar el nombre
+-- equipRod v4.1 — equipa la caña y espera a que Fisch la registre
+-- antes de intentar castear
 local function equipRod()
     pcall(function()
         local ch = LP.Character
         local h  = ch and ch:FindFirstChildOfClass("Humanoid")
         if not h then return end
+
+        -- Busca la primera caña en el backpack
+        local rod = nil
         for _, tool in pairs(LP.Backpack:GetChildren()) do
-            if isRod(tool) then
-                h:EquipTool(tool)
-                task.wait(0.8)
-                break
-            end
+            if isRod(tool) then rod = tool break end
         end
+        if not rod then return end
+
+        -- Equipa la caña
+        h:EquipTool(rod)
+
+        -- Espera a que aparezca equipada en el personaje (max 2s)
+        local timeout = tick() + 2
+        while tick() < timeout do
+            local equipped = ch:FindFirstChildOfClass("Tool")
+            if equipped and isRod(equipped) then break end
+            task.wait(0.1)
+        end
+
+        -- Delay extra para que Fisch registre la caña correctamente
+        task.wait(0.5)
     end)
 end
 
@@ -929,7 +942,7 @@ VerLbl.Parent = CfgPage
 VerLbl.Size = UDim2.new(1, -10, 0, 18)
 VerLbl.Position = UDim2.new(0, 6, 0, 32)
 VerLbl.BackgroundTransparency = 1
-VerLbl.Text = "Version: 3.9  |  Hub: NOVACORE"
+VerLbl.Text = "Version: 4.1  |  Hub: NOVACORE"
 VerLbl.TextColor3 = Color3.fromRGB(150,150,150)
 VerLbl.Font = Enum.Font.Gotham
 VerLbl.TextSize = 11
@@ -1052,4 +1065,4 @@ task.defer(function()
     activateTab(HomePage, HomeBtn, HomeInd)
 end)
 
-print("NOVACORE v3.9 cargado - Made BY JO21CX")
+print("NOVACORE v4.1 cargado - Made BY JO21CX")
