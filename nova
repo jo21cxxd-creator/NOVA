@@ -1,4 +1,4 @@
--- NOVACORE HUB v3.7
+-- NOVACORE HUB v3.8
 -- Made BY JO21CX
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/jo21cxxd-creator/NOVA/refs/heads/main/nova"))()
 
@@ -383,29 +383,16 @@ DiscBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ============================================================
--- FISCH v3.4 — FIX REEL: playerbar dentro del fish rect
--- ============================================================
+-- FISCH v3.8 — ROD DETECTION: basada en estructura interna
 --
--- ESTRUCTURA DEL GUI DE FISCH:
---   PGui
---   └── shakeui  (ScreenGui, .Enabled = true durante shake)
---       └── safezone (Frame)
---           └── button  (TextButton/ImageButton — el círculo)
+-- Las cañas en Fisch tienen una Folder llamada "events"
+-- con RemoteEvents exclusivos del sistema de pesca:
+--   - castAsync   (RemoteFunction)
+--   - handlebobber (RemoteEvent)
+--   - catchfinish  (RemoteEvent)
 --
---   PGui
---   └── reel  (ScreenGui, .Enabled = true durante minijuego)
---       └── bar  (Frame — contenedor horizontal)
---           ├── fish       → rectángulo BLANCO que se mueve solo (objetivo)
---           └── playerbar  → tu barra, controlada con hold/release
---
--- MECÁNICA:
---   hold    = playerbar se mueve a la DERECHA
---   release = playerbar se mueve a la IZQUIERDA
---   Hay que mantener playerbar DENTRO de fish
---
--- FIX v3.4: la comparación ahora es
---   "¿dónde está el CENTRO de playerbar respecto a los
---    bordes del rectángulo fish?"
+-- Ningun pez, treasure map, bag u otro item tiene esto.
+-- Deteccion 100% automatica sin depender del nombre del tool.
 -- ============================================================
 
 local fishCfg   = {fish=false, shake=false, reel=false}
@@ -414,9 +401,23 @@ local fishThread = nil
 local fishState  = "idle"
 local isHolding  = false
 
--- Detección de caña basada en BOBBER
--- Si el bobber existe en workspace = caña equipada y lanzada
--- Más confiable que buscar por nombre del tool
+-- ============================================================
+-- isRod v3.8 — Detecta cañas por estructura interna
+-- Busca la Folder "events" con RemoteEvents exclusivos de Fisch
+-- ============================================================
+local function isRod(tool)
+    if not tool:IsA("Tool") then return false end
+
+    local events = tool:FindFirstChild("events")
+    if not events then return false end
+
+    -- Cualquiera de estos es suficiente para confirmar que es caña
+    if events:FindFirstChild("castAsync")    then return true end
+    if events:FindFirstChild("handlebobber") then return true end
+    if events:FindFirstChild("catchfinish")  then return true end
+
+    return false
+end
 
 local function getVU()
     local ok, vu = pcall(function()
@@ -464,7 +465,6 @@ local function holdOff()
     end
 end
 
--- isCasting: bobber presente en workspace = caña en el agua
 local function isCasting()
     for _, v in pairs(workspace:GetDescendants()) do
         if v.Name == "bobber" and v:IsA("MeshPart") then return true end
@@ -472,46 +472,25 @@ local function isCasting()
     return false
 end
 
--- ============================================================
--- BLACKLIST MÍNIMA — solo para hasRod y equipRod
--- Problema: el Equipment Bag también tiene partes conectadas
--- al bobber, entonces FindFirstChildOfClass("Tool") lo detecta
--- como caña y el loop se traba intentando "pescar" con el bag.
--- isCasting() (bobber MeshPart) sigue siendo la detección principal.
--- ============================================================
-local TOOL_BLACKLIST = {
-    "bag", "equipment", "equip",
-    "barrel", "radar", "admin",
-    "bucket", "crate", "pouch",
-}
-
-local function isToolBlacklisted(tool)
-    local n = tool.Name:lower()
-    for _, kw in ipairs(TOOL_BLACKLIST) do
-        if n:find(kw, 1, true) then return true end  -- plain=true evita errores de patron
-    end
-    return false
-end
-
--- hasRod: bobber en workspace = caña lanzada (más confiable)
--- Si no hay bobber, checa si hay un Tool equipado que no sea el bag
+-- hasRod v3.8 — usa isRod para verificar si hay caña equipada
 local function hasRod()
     if isCasting() then return true end
     local ch = LP.Character
     if not ch then return false end
     local equipped = ch:FindFirstChildOfClass("Tool")
-    if equipped and not isToolBlacklisted(equipped) then return true end
+    if equipped and isRod(equipped) then return true end
     return false
 end
 
--- equipRod: equipa el primer Tool del backpack que no sea el bag
+-- equipRod v3.8 — equipa automaticamente la primera caña
+-- detectada por estructura interna, sin importar el nombre
 local function equipRod()
     pcall(function()
         local ch = LP.Character
         local h  = ch and ch:FindFirstChildOfClass("Humanoid")
         if not h then return end
         for _, tool in pairs(LP.Backpack:GetChildren()) do
-            if tool:IsA("Tool") and not isToolBlacklisted(tool) then
+            if isRod(tool) then
                 h:EquipTool(tool)
                 task.wait(0.8)
                 break
@@ -531,7 +510,6 @@ local function isReeling()
 end
 
 local function isCaught()
-    -- Solo buscar GUIs específicos de Fisch, "result" era demasiado genérico
     for _, gui in pairs(PGui:GetChildren()) do
         local n = gui.Name:lower()
         if n:find("catch") or n == "fishcatch" or n == "catchresult" then
@@ -545,8 +523,6 @@ local function doShake()
     pcall(function()
         local shakeui = PGui:FindFirstChild("shakeui")
         if not shakeui then return end
-
-        -- Intento 1: ruta exacta conocida shakeui > safezone > button
         local safezone = shakeui:FindFirstChild("safezone")
         if safezone then
             local button = safezone:FindFirstChild("button")
@@ -555,8 +531,6 @@ local function doShake()
                 return
             end
         end
-
-        -- Fallback: cualquier botón visible dentro de shakeui
         for _, v in pairs(shakeui:GetDescendants()) do
             if (v:IsA("TextButton") or v:IsA("ImageButton")) and v.Visible then
                 clickAt(v.AbsolutePosition + v.AbsoluteSize/2)
@@ -566,22 +540,6 @@ local function doShake()
     end)
 end
 
--- ============================================================
--- doReel v3.4 — LÓGICA CORREGIDA
---
--- ANTES (v3.3, INCORRECTO):
---   Comparaba dónde estaba el FISH respecto al PLAYERBAR
---   → intentaba seguir al pez, que es al revés
---
--- AHORA (v3.4, CORRECTO):
---   Compara dónde está el CENTRO del PLAYERBAR respecto
---   a los BORDES del FISH (rectángulo blanco objetivo)
---
---   • pbCenter < fishLeft  → playerbar fuera por izquierda → HOLD
---   • pbCenter > fishRight → playerbar fuera por derecha   → RELEASE
---   • pbCenter < fishCenter → dentro, mitad izq            → HOLD suave
---   • pbCenter > fishCenter → dentro, mitad der            → RELEASE suave
--- ============================================================
 local function doReel()
     pcall(function()
         local reel = PGui:FindFirstChild("reel")
@@ -589,43 +547,29 @@ local function doReel()
             holdOn() task.wait(0.06) holdOff() task.wait(0.06)
             return
         end
-
         local bar = reel:FindFirstChild("bar")
         if not bar then
             holdOn() task.wait(0.06) holdOff() task.wait(0.06)
             return
         end
-
         local fishFrame = bar:FindFirstChild("fish")
         local playerbar = bar:FindFirstChild("playerbar")
-
         if not fishFrame or not playerbar then
             holdOn() task.wait(0.06) holdOff() task.wait(0.06)
             return
         end
-
-        -- Centro de TU BARRA (playerbar) en X
-        local pbCenter = playerbar.AbsolutePosition.X
-                       + playerbar.AbsoluteSize.X / 2
-
-        -- Bordes del RECTÁNGULO BLANCO (fish) que se mueve solo
-        local fishLeft   = fishFrame.AbsolutePosition.X
-        local fishRight  = fishLeft + fishFrame.AbsoluteSize.X
-        local fishCenter = fishLeft + fishFrame.AbsoluteSize.X / 2
-
-        local margin = 6  -- px de margen de seguridad
-
+        local pbCenter  = playerbar.AbsolutePosition.X + playerbar.AbsoluteSize.X / 2
+        local fishLeft  = fishFrame.AbsolutePosition.X
+        local fishRight = fishLeft + fishFrame.AbsoluteSize.X
+        local fishCenter= fishLeft + fishFrame.AbsoluteSize.X / 2
+        local margin = 6
         if pbCenter < fishLeft + margin then
-            -- Playerbar fuera por la IZQUIERDA → hold (empujar derecha)
             holdOn()
         elseif pbCenter > fishRight - margin then
-            -- Playerbar fuera por la DERECHA → release (dejar ir izquierda)
             holdOff()
         elseif pbCenter < fishCenter then
-            -- Dentro del rect, mitad izquierda → hold suave hacia centro
             holdOn()
         else
-            -- Dentro del rect, mitad derecha → release suave
             holdOff()
         end
     end)
@@ -650,9 +594,7 @@ local function startFish()
         local caughtCd = false
         while fishCfg.fish do
             pcall(function()
-                -- Cache de isCasting para no iterar workspace 2 veces por tick
                 local casting = isCasting()
-
                 if not casting and not hasRod() then
                     fishState = "equipping"
                     holdOff()
@@ -928,7 +870,7 @@ VerLbl.Parent = CfgPage
 VerLbl.Size = UDim2.new(1, -10, 0, 18)
 VerLbl.Position = UDim2.new(0, 6, 0, 32)
 VerLbl.BackgroundTransparency = 1
-VerLbl.Text = "Version: 3.7  |  Hub: NOVACORE"
+VerLbl.Text = "Version: 3.8  |  Hub: NOVACORE"
 VerLbl.TextColor3 = Color3.fromRGB(150,150,150)
 VerLbl.Font = Enum.Font.Gotham
 VerLbl.TextSize = 11
@@ -1051,4 +993,4 @@ task.defer(function()
     activateTab(HomePage, HomeBtn, HomeInd)
 end)
 
-print("NOVACORE v3.7 cargado - Made BY JO21CX")
+print("NOVACORE v3.8 cargado - Made BY JO21CX")
