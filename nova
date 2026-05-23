@@ -1,5 +1,4 @@
-cat > /mnt/user-data/outputs/novacore_v3_3.lua << 'ENDOFSCRIPT'
--- NOVACORE HUB v3.3 (Fixed)
+-- NOVACORE HUB v3.7
 -- Made BY JO21CX
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/jo21cxxd-creator/NOVA/refs/heads/main/nova"))()
 
@@ -206,7 +205,7 @@ end
 
 local HomeBtn,   HomePage,   HomeInd   = createTab("Home")
 local FischBtn,  FischPage,  FischInd  = createTab("Fisch")
-local ServersBtn, ServersPage, ServersInd = createTab("Servers") -- Corregido
+local SeversBtn, SeversPage, SeversInd = createTab("Severs")
 local ShopBtn,   ShopPage,   ShopInd   = createTab("Shop")
 local CfgBtn,    CfgPage,    CfgInd    = createTab("Config")
 
@@ -384,8 +383,29 @@ DiscBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ============================================================
--- FISCH v3.3
--- FIX PRINCIPAL: blacklist de tools que NO son caña
+-- FISCH v3.4 — FIX REEL: playerbar dentro del fish rect
+-- ============================================================
+--
+-- ESTRUCTURA DEL GUI DE FISCH:
+--   PGui
+--   └── shakeui  (ScreenGui, .Enabled = true durante shake)
+--       └── safezone (Frame)
+--           └── button  (TextButton/ImageButton — el círculo)
+--
+--   PGui
+--   └── reel  (ScreenGui, .Enabled = true durante minijuego)
+--       └── bar  (Frame — contenedor horizontal)
+--           ├── fish       → rectángulo BLANCO que se mueve solo (objetivo)
+--           └── playerbar  → tu barra, controlada con hold/release
+--
+-- MECÁNICA:
+--   hold    = playerbar se mueve a la DERECHA
+--   release = playerbar se mueve a la IZQUIERDA
+--   Hay que mantener playerbar DENTRO de fish
+--
+-- FIX v3.4: la comparación ahora es
+--   "¿dónde está el CENTRO de playerbar respecto a los
+--    bordes del rectángulo fish?"
 -- ============================================================
 
 local fishCfg   = {fish=false, shake=false, reel=false}
@@ -394,48 +414,9 @@ local fishThread = nil
 local fishState  = "idle"
 local isHolding  = false
 
-local TOOL_BLACKLIST = {
-    "bag", "equip", "equipment",
-    "barrel", "admin", "radar",
-    "pack", "backpack", "pouch",
-    "bucket", "crate", "chest",
-    "accessory", "hat", "bobber bag",
-}
-
-local function isBlacklisted(toolName)
-    local n = toolName:lower()
-    for _, kw in ipairs(TOOL_BLACKLIST) do
-        if n:find(kw) then
-            return true
-        end
-    end
-    return false
-end
-
-local ROD_PART_KEYWORDS = {
-    "line", "string", "hook",
-    "reel", "fishing", "float",
-    "sinker", "lure", "wire",
-}
-
-local function toolHasRodParts(tool)
-    for _, v in pairs(tool:GetDescendants()) do
-        if v:IsA("RopeConstraint") or v:IsA("LineHandleAdornment") then
-            return true
-        end
-        local vn = v.Name:lower()
-        for _, kw in ipairs(ROD_PART_KEYWORDS) do
-            if vn:find(kw) then return true end
-        end
-    end
-    return false
-end
-
-local function isRod(tool)
-    if not tool:IsA("Tool") then return false end
-    if isBlacklisted(tool.Name) then return false end
-    return toolHasRodParts(tool)
-end
+-- Detección de caña basada en BOBBER
+-- Si el bobber existe en workspace = caña equipada y lanzada
+-- Más confiable que buscar por nombre del tool
 
 local function getVU()
     local ok, vu = pcall(function()
@@ -483,32 +464,54 @@ local function holdOff()
     end
 end
 
+-- isCasting: bobber presente en workspace = caña en el agua
 local function isCasting()
     for _, v in pairs(workspace:GetDescendants()) do
-        if v.Name == "bobber" and v:IsA("MeshPart") then
-            return true
-        end
+        if v.Name == "bobber" and v:IsA("MeshPart") then return true end
     end
     return false
 end
 
+-- ============================================================
+-- BLACKLIST MÍNIMA — solo para hasRod y equipRod
+-- Problema: el Equipment Bag también tiene partes conectadas
+-- al bobber, entonces FindFirstChildOfClass("Tool") lo detecta
+-- como caña y el loop se traba intentando "pescar" con el bag.
+-- isCasting() (bobber MeshPart) sigue siendo la detección principal.
+-- ============================================================
+local TOOL_BLACKLIST = {
+    "bag", "equipment", "equip",
+    "barrel", "radar", "admin",
+    "bucket", "crate", "pouch",
+}
+
+local function isToolBlacklisted(tool)
+    local n = tool.Name:lower()
+    for _, kw in ipairs(TOOL_BLACKLIST) do
+        if n:find(kw, 1, true) then return true end  -- plain=true evita errores de patron
+    end
+    return false
+end
+
+-- hasRod: bobber en workspace = caña lanzada (más confiable)
+-- Si no hay bobber, checa si hay un Tool equipado que no sea el bag
 local function hasRod()
     if isCasting() then return true end
     local ch = LP.Character
     if not ch then return false end
-    for _, tool in pairs(ch:GetChildren()) do
-        if isRod(tool) then return true end
-    end
+    local equipped = ch:FindFirstChildOfClass("Tool")
+    if equipped and not isToolBlacklisted(equipped) then return true end
     return false
 end
 
+-- equipRod: equipa el primer Tool del backpack que no sea el bag
 local function equipRod()
     pcall(function()
         local ch = LP.Character
         local h  = ch and ch:FindFirstChildOfClass("Humanoid")
         if not h then return end
         for _, tool in pairs(LP.Backpack:GetChildren()) do
-            if isRod(tool) then
+            if tool:IsA("Tool") and not isToolBlacklisted(tool) then
                 h:EquipTool(tool)
                 task.wait(0.8)
                 break
@@ -528,12 +531,12 @@ local function isReeling()
 end
 
 local function isCaught()
-    if PGui:FindFirstChild("catch") then return true end
-    if PGui:FindFirstChild("fishcatch") then return true end
-    if PGui:FindFirstChild("catchresult") then return true end
+    -- Solo buscar GUIs específicos de Fisch, "result" era demasiado genérico
     for _, gui in pairs(PGui:GetChildren()) do
         local n = gui.Name:lower()
-        if n:find("catch") or n:find("result") then return true end
+        if n:find("catch") or n == "fishcatch" or n == "catchresult" then
+            return true
+        end
     end
     return false
 end
@@ -542,15 +545,43 @@ local function doShake()
     pcall(function()
         local shakeui = PGui:FindFirstChild("shakeui")
         if not shakeui then return end
+
+        -- Intento 1: ruta exacta conocida shakeui > safezone > button
         local safezone = shakeui:FindFirstChild("safezone")
-        if not safezone then return end
-        local button = safezone:FindFirstChild("button")
-        if not button or not button.Visible then return end
-        local pos = button.AbsolutePosition + button.AbsoluteSize/2
-        clickAt(pos)
+        if safezone then
+            local button = safezone:FindFirstChild("button")
+            if button and button.Visible then
+                clickAt(button.AbsolutePosition + button.AbsoluteSize/2)
+                return
+            end
+        end
+
+        -- Fallback: cualquier botón visible dentro de shakeui
+        for _, v in pairs(shakeui:GetDescendants()) do
+            if (v:IsA("TextButton") or v:IsA("ImageButton")) and v.Visible then
+                clickAt(v.AbsolutePosition + v.AbsoluteSize/2)
+                return
+            end
+        end
     end)
 end
 
+-- ============================================================
+-- doReel v3.4 — LÓGICA CORREGIDA
+--
+-- ANTES (v3.3, INCORRECTO):
+--   Comparaba dónde estaba el FISH respecto al PLAYERBAR
+--   → intentaba seguir al pez, que es al revés
+--
+-- AHORA (v3.4, CORRECTO):
+--   Compara dónde está el CENTRO del PLAYERBAR respecto
+--   a los BORDES del FISH (rectángulo blanco objetivo)
+--
+--   • pbCenter < fishLeft  → playerbar fuera por izquierda → HOLD
+--   • pbCenter > fishRight → playerbar fuera por derecha   → RELEASE
+--   • pbCenter < fishCenter → dentro, mitad izq            → HOLD suave
+--   • pbCenter > fishCenter → dentro, mitad der            → RELEASE suave
+-- ============================================================
 local function doReel()
     pcall(function()
         local reel = PGui:FindFirstChild("reel")
@@ -558,29 +589,43 @@ local function doReel()
             holdOn() task.wait(0.06) holdOff() task.wait(0.06)
             return
         end
+
         local bar = reel:FindFirstChild("bar")
         if not bar then
             holdOn() task.wait(0.06) holdOff() task.wait(0.06)
             return
         end
+
         local fishFrame = bar:FindFirstChild("fish")
         local playerbar = bar:FindFirstChild("playerbar")
+
         if not fishFrame or not playerbar then
             holdOn() task.wait(0.06) holdOff() task.wait(0.06)
             return
         end
-        local fishX    = fishFrame.AbsolutePosition.X + fishFrame.AbsoluteSize.X/2
-        local pbLeft   = playerbar.AbsolutePosition.X
-        local pbRight  = pbLeft + playerbar.AbsoluteSize.X
-        local pbCenter = pbLeft + playerbar.AbsoluteSize.X/2
-        local margin   = 6
-        if fishX < pbLeft + margin then
+
+        -- Centro de TU BARRA (playerbar) en X
+        local pbCenter = playerbar.AbsolutePosition.X
+                       + playerbar.AbsoluteSize.X / 2
+
+        -- Bordes del RECTÁNGULO BLANCO (fish) que se mueve solo
+        local fishLeft   = fishFrame.AbsolutePosition.X
+        local fishRight  = fishLeft + fishFrame.AbsoluteSize.X
+        local fishCenter = fishLeft + fishFrame.AbsoluteSize.X / 2
+
+        local margin = 6  -- px de margen de seguridad
+
+        if pbCenter < fishLeft + margin then
+            -- Playerbar fuera por la IZQUIERDA → hold (empujar derecha)
             holdOn()
-        elseif fishX > pbRight - margin then
+        elseif pbCenter > fishRight - margin then
+            -- Playerbar fuera por la DERECHA → release (dejar ir izquierda)
             holdOff()
-        elseif fishX < pbCenter then
+        elseif pbCenter < fishCenter then
+            -- Dentro del rect, mitad izquierda → hold suave hacia centro
             holdOn()
         else
+            -- Dentro del rect, mitad derecha → release suave
             holdOff()
         end
     end)
@@ -597,10 +642,7 @@ local function doCast()
 end
 
 local function startFish()
-    if fishThread then
-        task.cancel(fishThread)
-        fishThread = nil
-    end
+    if fishThread then task.cancel(fishThread) fishThread = nil end
     fishState = "idle"
     holdOff()
 
@@ -608,7 +650,10 @@ local function startFish()
         local caughtCd = false
         while fishCfg.fish do
             pcall(function()
-                if not hasRod() then
+                -- Cache de isCasting para no iterar workspace 2 veces por tick
+                local casting = isCasting()
+
+                if not casting and not hasRod() then
                     fishState = "equipping"
                     holdOff()
                     equipRod()
@@ -632,7 +677,7 @@ local function startFish()
                     end
                     return
                 end
-                if isCasting() then
+                if casting then
                     fishState = "waiting"
                     if fishCfg.shake and isShaking() then
                         fishState = "shaking"
@@ -654,10 +699,7 @@ end
 
 local function stopFish()
     fishCfg.fish = false
-    if fishThread then
-        task.cancel(fishThread)
-        fishThread = nil
-    end
+    if fishThread then task.cancel(fishThread) fishThread = nil end
     fishState = "idle"
     holdOff()
 end
@@ -689,9 +731,9 @@ FishStatsLbl.TextSize = 10
 FishStatsLbl.TextXAlignment = Enum.TextXAlignment.Left
 
 local stateColors = {
-    idle="808080",     equipping="DCB432",
-    casting="50A0FF",  waiting="64C864",
-    shaking="FFA032",  reeling="FF5050",
+    idle="808080",    equipping="DCB432",
+    casting="50A0FF", waiting="64C864",
+    shaking="FFA032", reeling="FF5050",
     caught="50DC78"
 }
 
@@ -705,25 +747,26 @@ RunService.Heartbeat:Connect(function(dt)
             FishStateLbl.Text = "Estado: "..fishState
             local col = stateColors[fishState]
             if col then
-                local r = tonumber(col:sub(1,2),16)/255
-                local g = tonumber(col:sub(3,4),16)/255
-                local b = tonumber(col:sub(5,6),16)/255
-                FishStateLbl.TextColor3 = Color3.new(r,g,b)
+                FishStateLbl.TextColor3 = Color3.new(
+                    tonumber(col:sub(1,2),16)/255,
+                    tonumber(col:sub(3,4),16)/255,
+                    tonumber(col:sub(5,6),16)/255
+                )
             end
         end)
     end
 end)
 
 makeToggle(FischPage, "Auto Pescar", 60, false,
-    function() fishCfg.fish=true startFish() end,
+    function() fishCfg.fish=true  startFish() end,
     function() stopFish() end
 )
 makeToggle(FischPage, "Auto Shake", 96, false,
-    function() fishCfg.shake=true end,
+    function() fishCfg.shake=true  end,
     function() fishCfg.shake=false end
 )
 makeToggle(FischPage, "Auto Reel", 132, false,
-    function() fishCfg.reel=true end,
+    function() fishCfg.reel=true  end,
     function() fishCfg.reel=false end
 )
 
@@ -746,15 +789,15 @@ FishResetBtn.MouseButton1Click:Connect(function()
     fishStats.catch = 0
 end)
 
--- SEVERS PAGE (corregido a Servers)
-sectionLabel(ServersPage, "Server Hop", 4)
-divLine(ServersPage, 24)
+-- SEVERS PAGE
+sectionLabel(SeversPage, "Server Hop", 4)
+divLine(SeversPage, 24)
 
 local servers    = {}
 local currentJob = game.JobId
 
 local SevSearchBtn = Instance.new("TextButton")
-SevSearchBtn.Parent = ServersPage
+SevSearchBtn.Parent = SeversPage
 SevSearchBtn.Size = UDim2.new(0.48, -4, 0, 26)
 SevSearchBtn.Position = UDim2.new(0, 6, 0, 30)
 SevSearchBtn.BackgroundColor3 = DARK2
@@ -769,7 +812,7 @@ SSStr.Color = RED
 SSStr.Thickness = 1
 
 local SevHopBtn = Instance.new("TextButton")
-SevHopBtn.Parent = ServersPage
+SevHopBtn.Parent = SeversPage
 SevHopBtn.Size = UDim2.new(0.48, -4, 0, 26)
 SevHopBtn.Position = UDim2.new(0.52, 2, 0, 30)
 SevHopBtn.BackgroundColor3 = DARK2
@@ -784,7 +827,7 @@ SHStr.Color = Color3.fromRGB(60,200,100)
 SHStr.Thickness = 1
 
 local SevScroll = Instance.new("ScrollingFrame")
-SevScroll.Parent = ServersPage
+SevScroll.Parent = SeversPage
 SevScroll.Size = UDim2.new(1, -12, 1, -68)
 SevScroll.Position = UDim2.new(0, 6, 0, 62)
 SevScroll.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
@@ -845,7 +888,7 @@ local function fetchServers()
                 end
             end
             cursor = data.nextPageCursor
-            if not cursor then break end
+            if not cursor or cursor == "" then break end
         end
     end
     table.sort(servers, function(a,b) return a.playing < b.playing end)
@@ -885,7 +928,7 @@ VerLbl.Parent = CfgPage
 VerLbl.Size = UDim2.new(1, -10, 0, 18)
 VerLbl.Position = UDim2.new(0, 6, 0, 32)
 VerLbl.BackgroundTransparency = 1
-VerLbl.Text = "Version: 3.3  |  Hub: NOVACORE"
+VerLbl.Text = "Version: 3.7  |  Hub: NOVACORE"
 VerLbl.TextColor3 = Color3.fromRGB(150,150,150)
 VerLbl.Font = Enum.Font.Gotham
 VerLbl.TextSize = 11
@@ -901,8 +944,7 @@ ExecLbl.Font = Enum.Font.Gotham
 ExecLbl.TextSize = 11
 ExecLbl.TextXAlignment = Enum.TextXAlignment.Left
 pcall(function()
-    local name = (identifyexecutor and identifyexecutor()) or "Unknown"
-    ExecLbl.Text = "Executor: "..name
+    ExecLbl.Text = "Executor: "..((identifyexecutor and identifyexecutor()) or "Unknown")
 end)
 
 -- MINI LOGO
@@ -924,10 +966,7 @@ MiniStr.Color = RED
 MiniStr.Thickness = 2
 
 -- DRAG Main
-local dragging  = false
-local dragInput = nil
-local dragStart = nil
-local startPos  = nil
+local dragging, dragInput, dragStart, startPos = false, nil, nil, nil
 
 Header.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
@@ -950,11 +989,8 @@ Header.InputChanged:Connect(function(input)
 end)
 
 -- DRAG MiniLogo
-local miniDragging  = false
-local miniDragInput = nil
-local miniDragStart = nil
-local miniDragPos   = nil
-local miniMoved     = false
+local miniDragging, miniDragInput, miniDragStart, miniDragPos, miniMoved =
+      false, nil, nil, nil, false
 
 MiniLogo.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
@@ -1006,10 +1042,7 @@ MinBtn.MouseButton1Click:Connect(function()
     MiniLogo.Visible = true
 end)
 MiniLogo.MouseButton1Click:Connect(function()
-    if miniMoved then
-        miniMoved = false
-        return
-    end
+    if miniMoved then miniMoved = false return end
     Main.Visible = true
     MiniLogo.Visible = false
 end)
@@ -1018,7 +1051,4 @@ task.defer(function()
     activateTab(HomePage, HomeBtn, HomeInd)
 end)
 
-print("NOVACORE v3.3 cargado - Made BY JO21CX")
-ENDOFSCRIPT
-
-echo "OK: $(wc -l < /mnt/user-data/outputs/novacore_v3_3.lua) lineas"
+print("NOVACORE v3.7 cargado - Made BY JO21CX")
