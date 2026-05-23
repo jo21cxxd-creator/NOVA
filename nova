@@ -1,4 +1,4 @@
--- NOVACORE HUB v3.1 (Fixed)
+-- NOVACORE HUB v3.2 (Fixed)
 -- Made BY JO21CX
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/jo21cxxd-creator/NOVA/refs/heads/main/nova"))()
 
@@ -149,7 +149,7 @@ Brand.TextXAlignment = Enum.TextXAlignment.Right
 Brand.ZIndex = 4
 
 -- TABS
-local tabPages = {}
+local tabPages   = {}
 local tabButtons = {}
 
 local function activateTab(Page, Btn, Ind)
@@ -383,19 +383,16 @@ DiscBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ============================================================
--- FISCH v3 - PATHS EXACTOS
--- SHAKE: PlayerGui.shakeui.safezone.button (ImageButton)
--- REEL:  PlayerGui.reel.bar.modal (TextButton - hold/release)
---        PlayerGui.reel.bar.fish (Frame - posicion pez)
---        PlayerGui.reel.bar.playerbar (Frame - posicion jugador)
+-- FISCH v3.2
+-- FIX PRINCIPAL: detectar caña por bobber/hilo, NO por nombre
 -- ============================================================
-local fishCfg = {fish=false, shake=false, reel=false}
+local fishCfg   = {fish=false, shake=false, reel=false}
 local fishStats = {cast=0, catch=0}
 local fishThread = nil
-local fishState = "idle"
-local isHolding = false
+local fishState  = "idle"
+local isHolding  = false
 
--- FIX #1: getVU() con fallback seguro para cualquier executor
+-- FIX: getVU con fallback seguro
 local function getVU()
     local ok, vu = pcall(function()
         return cloneref(game:GetService("VirtualUser"))
@@ -442,6 +439,35 @@ local function holdOff()
     end
 end
 
+-- ============================================================
+-- FIX #7: Deteccion de caña por estructura interna (bobber/hilo)
+-- No depende del nombre — funciona con TODAS las cañas de Fisch
+-- ============================================================
+
+-- Palabras clave que identifican partes de una caña de pescar
+local ROD_PART_KEYWORDS = {
+    "line", "string", "hook", "bobber", "reel",
+    "fishing", "float", "sinker", "lure", "wire"
+}
+
+local function toolHasRodParts(tool)
+    for _, v in pairs(tool:GetDescendants()) do
+        -- Por tipo de instancia
+        if v:IsA("RopeConstraint") or v:IsA("LineHandleAdornment") then
+            return true
+        end
+        -- Por nombre de descendiente
+        local vn = v.Name:lower()
+        for _, kw in ipairs(ROD_PART_KEYWORDS) do
+            if vn:find(kw) then
+                return true
+            end
+        end
+    end
+    return false
+end
+
+-- Busca bobber en workspace (caña ya lanzada)
 local function isCasting()
     for _, v in pairs(workspace:GetDescendants()) do
         if v.Name == "bobber" and v:IsA("MeshPart") then
@@ -449,6 +475,38 @@ local function isCasting()
         end
     end
     return false
+end
+
+-- Verifica si ya hay una caña equipada en el personaje
+local function hasRod()
+    -- Si hay bobber en el mundo, la caña esta equipada y lanzada
+    if isCasting() then return true end
+    -- Si no, revisar si el personaje tiene un tool con partes de caña
+    local ch = LP.Character
+    if not ch then return false end
+    for _, tool in pairs(ch:GetChildren()) do
+        if tool:IsA("Tool") and toolHasRodParts(tool) then
+            return true
+        end
+    end
+    return false
+end
+
+-- Equipa la caña buscando por estructura interna (bobber/hilo), no por nombre
+local function equipRod()
+    pcall(function()
+        local ch = LP.Character
+        local h  = ch and ch:FindFirstChildOfClass("Humanoid")
+        if not h then return end
+
+        for _, tool in pairs(LP.Backpack:GetChildren()) do
+            if tool:IsA("Tool") and toolHasRodParts(tool) then
+                h:EquipTool(tool)
+                task.wait(0.8)
+                break -- solo equipa la primera caña encontrada
+            end
+        end
+    end)
 end
 
 local function isShaking()
@@ -461,12 +519,11 @@ local function isReeling()
     return reel ~= nil and reel.Enabled == true
 end
 
--- FIX #2: isCaught() mejorado — detecta GUI de resultado o desaparicion del reel
+-- FIX: isCaught mejorado con busqueda dinamica
 local function isCaught()
     if PGui:FindFirstChild("catch") then return true end
     if PGui:FindFirstChild("fishcatch") then return true end
     if PGui:FindFirstChild("catchresult") then return true end
-    -- Detectar cualquier GUI con "catch" o "result" en el nombre
     for _, gui in pairs(PGui:GetChildren()) do
         local n = gui.Name:lower()
         if n:find("catch") or n:find("result") then
@@ -507,11 +564,11 @@ local function doReel()
             holdOn() task.wait(0.06) holdOff() task.wait(0.06)
             return
         end
-        local fishX   = fishFrame.AbsolutePosition.X + fishFrame.AbsoluteSize.X/2
-        local pbLeft  = playerbar.AbsolutePosition.X
-        local pbRight = pbLeft + playerbar.AbsoluteSize.X
-        local pbCenter= pbLeft + playerbar.AbsoluteSize.X/2
-        local margin  = 6
+        local fishX    = fishFrame.AbsolutePosition.X + fishFrame.AbsoluteSize.X/2
+        local pbLeft   = playerbar.AbsolutePosition.X
+        local pbRight  = pbLeft + playerbar.AbsoluteSize.X
+        local pbCenter = pbLeft + playerbar.AbsoluteSize.X/2
+        local margin   = 6
         if fishX < pbLeft + margin then
             holdOn()
         elseif fishX > pbRight - margin then
@@ -534,41 +591,8 @@ local function doCast()
     end)
 end
 
-local function hasRod()
-    local ch = LP.Character
-    if not ch then return false end
-    for _, v in pairs(ch:GetChildren()) do
-        if v:IsA("Tool") then
-            local n = v.Name:lower()
-            if n:find("rod") or n:find("fish") or n:find("cana") then
-                return true
-            end
-        end
-    end
-    return false
-end
-
-local function equipRod()
-    pcall(function()
-        for _, t in pairs(LP.Backpack:GetChildren()) do
-            if t:IsA("Tool") then
-                local n = t.Name:lower()
-                if n:find("rod") or n:find("fish") or n:find("cana") then
-                    local h = LP.Character and LP.Character:FindFirstChildOfClass("Humanoid")
-                    if h then
-                        h:EquipTool(t)
-                        task.wait(0.8)
-                    end
-                end
-            end
-        end
-    end)
-end
-
--- FIX #3: loop de pesca como task.spawn con while, NO Heartbeat
--- Esto permite usar task.wait() correctamente dentro del loop
+-- FIX: loop como task.spawn + while, no Heartbeat
 local function startFish()
-    -- Detener loop anterior si existe
     if fishThread then
         task.cancel(fishThread)
         fishThread = nil
@@ -580,7 +604,7 @@ local function startFish()
         local caughtCd = false
         while fishCfg.fish do
             pcall(function()
-                -- 1. Equip caña
+                -- 1. Equip caña (por estructura interna, no nombre)
                 if not hasRod() then
                     fishState = "equipping"
                     holdOff()
@@ -722,12 +746,11 @@ FishResetBtn.Font = Enum.Font.Gotham
 FishResetBtn.TextSize = 11
 FishResetBtn.BorderSizePixel = 0
 Instance.new("UICorner", FishResetBtn).CornerRadius = UDim.new(0, 6)
--- FIX #6: separar asignaciones en lineas distintas
 local FRStr = Instance.new("UIStroke", FishResetBtn)
 FRStr.Color = GRAY
 FRStr.Thickness = 1
 FishResetBtn.MouseButton1Click:Connect(function()
-    fishStats.cast = 0
+    fishStats.cast  = 0
     fishStats.catch = 0
 end)
 
@@ -735,7 +758,7 @@ end)
 sectionLabel(SeversPage, "Server Hop", 4)
 divLine(SeversPage, 24)
 
-local servers = {}
+local servers    = {}
 local currentJob = game.JobId
 
 local SevSearchBtn = Instance.new("TextButton")
@@ -835,7 +858,7 @@ local function fetchServers()
     end
     table.sort(servers, function(a,b) return a.playing < b.playing end)
     for _, s in pairs(servers) do addServerEntry(s) end
-    -- FIX #4: usar task.defer para que UIListLayout calcule el tamaño primero
+    -- FIX: task.defer para que el layout calcule antes de asignar CanvasSize
     task.defer(function()
         SevScroll.CanvasSize = UDim2.new(0, 0, 0, SevLayout.AbsoluteContentSize.Y + 8)
     end)
@@ -871,7 +894,7 @@ VerLbl.Parent = CfgPage
 VerLbl.Size = UDim2.new(1, -10, 0, 18)
 VerLbl.Position = UDim2.new(0, 6, 0, 32)
 VerLbl.BackgroundTransparency = 1
-VerLbl.Text = "Version: 3.1  |  Hub: NOVACORE"
+VerLbl.Text = "Version: 3.2  |  Hub: NOVACORE"
 VerLbl.TextColor3 = Color3.fromRGB(150,150,150)
 VerLbl.Font = Enum.Font.Gotham
 VerLbl.TextSize = 11
@@ -909,7 +932,7 @@ local MiniStr = Instance.new("UIStroke", MiniLogo)
 MiniStr.Color = RED
 MiniStr.Thickness = 2
 
--- DRAG - Main
+-- DRAG Main
 local dragging  = false
 local dragInput = nil
 local dragStart = nil
@@ -918,9 +941,9 @@ local startPos  = nil
 Header.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
     or input.UserInputType == Enum.UserInputType.Touch then
-        dragging = true
+        dragging  = true
         dragStart = input.Position
-        startPos = Main.Position
+        startPos  = Main.Position
         input.Changed:Connect(function()
             if input.UserInputState == Enum.UserInputState.End then
                 dragging = false
@@ -935,13 +958,12 @@ Header.InputChanged:Connect(function(input)
     end
 end)
 
--- DRAG - MiniLogo
--- FIX #5: usar distancia de arrastre para distinguir drag vs click
+-- DRAG MiniLogo con fix de drag vs click
 local miniDragging  = false
 local miniDragInput = nil
 local miniDragStart = nil
 local miniDragPos   = nil
-local miniMoved     = false  -- flag: se movio suficiente para ser drag real
+local miniMoved     = false
 
 MiniLogo.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1
@@ -975,7 +997,6 @@ UIS.InputChanged:Connect(function(input)
     end
     if input == miniDragInput and miniDragging and miniDragStart then
         local delta = input.Position - miniDragStart
-        -- Solo considerar drag si se movio mas de 4px
         if delta.Magnitude > 4 then
             miniMoved = true
             MiniLogo.Position = UDim2.new(
@@ -993,7 +1014,6 @@ MinBtn.MouseButton1Click:Connect(function()
     Main.Visible = false
     MiniLogo.Visible = true
 end)
--- FIX #5: abrir solo si NO fue un drag real
 MiniLogo.MouseButton1Click:Connect(function()
     if miniMoved then
         miniMoved = false
@@ -1007,4 +1027,4 @@ task.defer(function()
     activateTab(HomePage, HomeBtn, HomeInd)
 end)
 
-print("NOVACORE v3.1 cargado - Made BY JO21CX")
+print("NOVACORE v3.2 cargado - Made BY JO21CX")
