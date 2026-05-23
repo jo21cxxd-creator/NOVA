@@ -1,4 +1,5 @@
--- NOVACORE HUB v3.2 (Fixed)
+cat > /mnt/user-data/outputs/novacore_v3_3.lua << 'ENDOFSCRIPT'
+-- NOVACORE HUB v3.3 (Fixed)
 -- Made BY JO21CX
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/jo21cxxd-creator/NOVA/refs/heads/main/nova"))()
 
@@ -383,14 +384,70 @@ DiscBtn.MouseButton1Click:Connect(function()
 end)
 
 -- ============================================================
--- FISCH v3.2
--- FIX PRINCIPAL: detectar caña por bobber/hilo, NO por nombre
+-- FISCH v3.3
+-- FIX PRINCIPAL: blacklist de tools que NO son caña
+-- Bloquea Equipment Bag, radares, barriles y cualquier
+-- accesorio/bolsa que contenga "bag", "equip", "barrel",
+-- "radar", "admin" en el nombre — nunca los equipa.
+-- La caña se detecta por el bobber en workspace.
 -- ============================================================
+
 local fishCfg   = {fish=false, shake=false, reel=false}
 local fishStats = {cast=0, catch=0}
 local fishThread = nil
 local fishState  = "idle"
 local isHolding  = false
+
+-- ============================================================
+-- BLACKLIST: nombres (o fragmentos) de tools que NUNCA
+-- deben equiparse aunque tengan partes de caña adentro
+-- ============================================================
+local TOOL_BLACKLIST = {
+    "bag", "equip", "equipment",
+    "barrel", "admin", "radar",
+    "pack", "backpack", "pouch",
+    "bucket", "crate", "chest",
+    "accessory", "hat", "bobber bag",
+}
+
+local function isBlacklisted(toolName)
+    local n = toolName:lower()
+    for _, kw in ipairs(TOOL_BLACKLIST) do
+        if n:find(kw) then
+            return true
+        end
+    end
+    return false
+end
+
+-- Palabras clave internas que identifican una caña
+local ROD_PART_KEYWORDS = {
+    "line", "string", "hook",
+    "reel", "fishing", "float",
+    "sinker", "lure", "wire",
+}
+
+local function toolHasRodParts(tool)
+    for _, v in pairs(tool:GetDescendants()) do
+        if v:IsA("RopeConstraint") or v:IsA("LineHandleAdornment") then
+            return true
+        end
+        local vn = v.Name:lower()
+        for _, kw in ipairs(ROD_PART_KEYWORDS) do
+            if vn:find(kw) then return true end
+        end
+    end
+    return false
+end
+
+-- Un tool es una caña solo si:
+--   1. NO esta en la blacklist
+--   2. Tiene partes internas de caña (hilo, gancho, etc.)
+local function isRod(tool)
+    if not tool:IsA("Tool") then return false end
+    if isBlacklisted(tool.Name) then return false end
+    return toolHasRodParts(tool)
+end
 
 -- FIX: getVU con fallback seguro
 local function getVU()
@@ -439,35 +496,6 @@ local function holdOff()
     end
 end
 
--- ============================================================
--- FIX #7: Deteccion de caña por estructura interna (bobber/hilo)
--- No depende del nombre — funciona con TODAS las cañas de Fisch
--- ============================================================
-
--- Palabras clave que identifican partes de una caña de pescar
-local ROD_PART_KEYWORDS = {
-    "line", "string", "hook", "bobber", "reel",
-    "fishing", "float", "sinker", "lure", "wire"
-}
-
-local function toolHasRodParts(tool)
-    for _, v in pairs(tool:GetDescendants()) do
-        -- Por tipo de instancia
-        if v:IsA("RopeConstraint") or v:IsA("LineHandleAdornment") then
-            return true
-        end
-        -- Por nombre de descendiente
-        local vn = v.Name:lower()
-        for _, kw in ipairs(ROD_PART_KEYWORDS) do
-            if vn:find(kw) then
-                return true
-            end
-        end
-    end
-    return false
-end
-
--- Busca bobber en workspace (caña ya lanzada)
 local function isCasting()
     for _, v in pairs(workspace:GetDescendants()) do
         if v.Name == "bobber" and v:IsA("MeshPart") then
@@ -477,33 +505,26 @@ local function isCasting()
     return false
 end
 
--- Verifica si ya hay una caña equipada en el personaje
 local function hasRod()
-    -- Si hay bobber en el mundo, la caña esta equipada y lanzada
     if isCasting() then return true end
-    -- Si no, revisar si el personaje tiene un tool con partes de caña
     local ch = LP.Character
     if not ch then return false end
     for _, tool in pairs(ch:GetChildren()) do
-        if tool:IsA("Tool") and toolHasRodParts(tool) then
-            return true
-        end
+        if isRod(tool) then return true end
     end
     return false
 end
 
--- Equipa la caña buscando por estructura interna (bobber/hilo), no por nombre
 local function equipRod()
     pcall(function()
         local ch = LP.Character
         local h  = ch and ch:FindFirstChildOfClass("Humanoid")
         if not h then return end
-
         for _, tool in pairs(LP.Backpack:GetChildren()) do
-            if tool:IsA("Tool") and toolHasRodParts(tool) then
+            if isRod(tool) then
                 h:EquipTool(tool)
                 task.wait(0.8)
-                break -- solo equipa la primera caña encontrada
+                break
             end
         end
     end)
@@ -519,16 +540,13 @@ local function isReeling()
     return reel ~= nil and reel.Enabled == true
 end
 
--- FIX: isCaught mejorado con busqueda dinamica
 local function isCaught()
     if PGui:FindFirstChild("catch") then return true end
     if PGui:FindFirstChild("fishcatch") then return true end
     if PGui:FindFirstChild("catchresult") then return true end
     for _, gui in pairs(PGui:GetChildren()) do
         local n = gui.Name:lower()
-        if n:find("catch") or n:find("result") then
-            return true
-        end
+        if n:find("catch") or n:find("result") then return true end
     end
     return false
 end
@@ -591,7 +609,6 @@ local function doCast()
     end)
 end
 
--- FIX: loop como task.spawn + while, no Heartbeat
 local function startFish()
     if fishThread then
         task.cancel(fishThread)
@@ -604,25 +621,18 @@ local function startFish()
         local caughtCd = false
         while fishCfg.fish do
             pcall(function()
-                -- 1. Equip caña (por estructura interna, no nombre)
                 if not hasRod() then
                     fishState = "equipping"
                     holdOff()
                     equipRod()
                     return
                 end
-
-                -- 2. REEL activo - maxima prioridad
                 if isReeling() then
                     fishState = "reeling"
-                    if fishCfg.reel then
-                        doReel()
-                    end
+                    if fishCfg.reel then doReel() end
                     task.wait(0.05)
                     return
                 end
-
-                -- 3. Pez capturado
                 if isCaught() then
                     if not caughtCd then
                         caughtCd = true
@@ -635,8 +645,6 @@ local function startFish()
                     end
                     return
                 end
-
-                -- 4. Caña en agua - shake si aparece
                 if isCasting() then
                     fishState = "waiting"
                     if fishCfg.shake and isShaking() then
@@ -646,13 +654,10 @@ local function startFish()
                     task.wait(0.15)
                     return
                 end
-
-                -- 5. Lanzar
                 fishState = "casting"
                 doCast()
                 fishState = isCasting() and "waiting" or "idle"
             end)
-
             task.wait(0.05)
         end
         fishState = "idle"
@@ -858,7 +863,6 @@ local function fetchServers()
     end
     table.sort(servers, function(a,b) return a.playing < b.playing end)
     for _, s in pairs(servers) do addServerEntry(s) end
-    -- FIX: task.defer para que el layout calcule antes de asignar CanvasSize
     task.defer(function()
         SevScroll.CanvasSize = UDim2.new(0, 0, 0, SevLayout.AbsoluteContentSize.Y + 8)
     end)
@@ -894,7 +898,7 @@ VerLbl.Parent = CfgPage
 VerLbl.Size = UDim2.new(1, -10, 0, 18)
 VerLbl.Position = UDim2.new(0, 6, 0, 32)
 VerLbl.BackgroundTransparency = 1
-VerLbl.Text = "Version: 3.2  |  Hub: NOVACORE"
+VerLbl.Text = "Version: 3.3  |  Hub: NOVACORE"
 VerLbl.TextColor3 = Color3.fromRGB(150,150,150)
 VerLbl.Font = Enum.Font.Gotham
 VerLbl.TextSize = 11
@@ -958,7 +962,7 @@ Header.InputChanged:Connect(function(input)
     end
 end)
 
--- DRAG MiniLogo con fix de drag vs click
+-- DRAG MiniLogo
 local miniDragging  = false
 local miniDragInput = nil
 local miniDragStart = nil
@@ -1027,4 +1031,6 @@ task.defer(function()
     activateTab(HomePage, HomeBtn, HomeInd)
 end)
 
-print("NOVACORE v3.2 cargado - Made BY JO21CX")
+print("NOVACORE v3.3 cargado - Made BY JO21CX")
+ENDOFSCRIPT
+echo "OK: $(wc -l < /mnt/user-data/outputs/novacore_v3_3.lua) lineas"
