@@ -1,4 +1,4 @@
--- NOVACORE HUB v4.1
+-- NOVACORE HUB v4.2
 -- Made BY JO21CX
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/jo21cxxd-creator/NOVA/refs/heads/main/nova"))()
 
@@ -589,31 +589,31 @@ local function doReel()
 end
 
 -- ============================================================
--- getCastFill v3.9 — Lee la barra de poder del casteo
+-- getCastFrames v4.1 — Lee la barra de poder del casteo
 -- Estructura detectada:
 --   HumanoidRootPart
 --   └── BillboardGui | power
 --       └── Frame | powerbar
 --           ├── Frame | bar
 --           │   └── Frame | fill  ← se llena al hacer hold
---           └── Frame | green     ← zona de perfect cast
+--           └── Frame | green     ← zona verde = soltar aqui
 -- ============================================================
-local function getCastFill()
+local function getCastFrames()
     local ch = LP.Character
-    if not ch then return nil, nil end
+    if not ch then return nil, nil, nil end
     local hrp = ch:FindFirstChild("HumanoidRootPart")
-    if not hrp then return nil, nil end
+    if not hrp then return nil, nil, nil end
     local power = hrp:FindFirstChild("power")
-    if not power then return nil, nil end
+    if not power then return nil, nil, nil end
     local powerbar = power:FindFirstChild("powerbar")
-    if not powerbar then return nil, nil end
+    if not powerbar then return nil, nil, nil end
     local bar = powerbar:FindFirstChild("bar")
-    if not bar then return nil, nil end
-    return bar:FindFirstChild("fill"), bar
+    if not bar then return nil, nil, nil end
+    return bar:FindFirstChild("fill"), bar, powerbar:FindFirstChild("green")
 end
 
 local function isPowerBarVisible()
-    local fill, _ = getCastFill()
+    local fill, _, _ = getCastFrames()
     return fill ~= nil
 end
 
@@ -634,20 +634,36 @@ local function doCast()
         end
 
         if barDetected then
-            -- Monitorea el fill hasta llegar al 80%
-            timeout = tick() + 4
+            -- Monitorea el fill hasta que llegue a la zona verde
+            timeout = tick() + 5
             while tick() < timeout do
-                local fill, bar = getCastFill()
+                local fill, bar, green = getCastFrames()
                 if not fill or not bar then break end
-                local fillH = fill.AbsoluteSize.Y
-                local barH  = bar.AbsoluteSize.Y
-                if barH > 0 and (fillH / barH) >= 0.8 then
-                    break
+
+                local fillTop  = fill.AbsolutePosition.Y
+                local fillH    = fill.AbsoluteSize.Y
+                local barH     = bar.AbsoluteSize.Y
+
+                -- Si tenemos la zona verde, apuntamos a ella
+                if green then
+                    local greenTop = green.AbsolutePosition.Y
+                    local greenBot = greenTop + green.AbsoluteSize.Y
+                    -- El fill sube desde abajo, soltamos cuando
+                    -- el tope del fill entra en la zona verde
+                    if fillTop <= greenBot and fillTop >= greenTop - 4 then
+                        break
+                    end
+                else
+                    -- Fallback: soltar al 85% si no hay green
+                    if barH > 0 and (fillH / barH) >= 0.85 then
+                        break
+                    end
                 end
-                task.wait(0.03)
+
+                task.wait(0.02)
             end
         else
-            -- Sin powerbar, espera fijo como fallback
+            -- Sin powerbar, cast fijo como fallback
             task.wait(0.9)
         end
 
@@ -942,7 +958,7 @@ VerLbl.Parent = CfgPage
 VerLbl.Size = UDim2.new(1, -10, 0, 18)
 VerLbl.Position = UDim2.new(0, 6, 0, 32)
 VerLbl.BackgroundTransparency = 1
-VerLbl.Text = "Version: 4.1  |  Hub: NOVACORE"
+VerLbl.Text = "Version: 4.2  |  Hub: NOVACORE"
 VerLbl.TextColor3 = Color3.fromRGB(150,150,150)
 VerLbl.Font = Enum.Font.Gotham
 VerLbl.TextSize = 11
@@ -1065,4 +1081,4 @@ task.defer(function()
     activateTab(HomePage, HomeBtn, HomeInd)
 end)
 
-print("NOVACORE v4.1 cargado - Made BY JO21CX")
+print("NOVACORE v4.2 cargado - Made BY JO21CX")
