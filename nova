@@ -1,4 +1,4 @@
--- NOVACORE HUB v3.8
+-- NOVACORE HUB v3.9
 -- Made BY JO21CX
 -- loadstring(game:HttpGet("https://raw.githubusercontent.com/jo21cxxd-creator/NOVA/refs/heads/main/nova"))()
 
@@ -575,13 +575,72 @@ local function doReel()
     end)
 end
 
+-- ============================================================
+-- getCastFill v3.9 — Lee la barra de poder del casteo
+-- Estructura detectada:
+--   HumanoidRootPart
+--   └── BillboardGui | power
+--       └── Frame | powerbar
+--           ├── Frame | bar
+--           │   └── Frame | fill  ← se llena al hacer hold
+--           └── Frame | green     ← zona de perfect cast
+-- ============================================================
+local function getCastFill()
+    local ch = LP.Character
+    if not ch then return nil, nil end
+    local hrp = ch:FindFirstChild("HumanoidRootPart")
+    if not hrp then return nil, nil end
+    local power = hrp:FindFirstChild("power")
+    if not power then return nil, nil end
+    local powerbar = power:FindFirstChild("powerbar")
+    if not powerbar then return nil, nil end
+    local bar = powerbar:FindFirstChild("bar")
+    if not bar then return nil, nil end
+    return bar:FindFirstChild("fill"), bar
+end
+
+local function isPowerBarVisible()
+    local fill, _ = getCastFill()
+    return fill ~= nil
+end
+
 local function doCast()
     pcall(function()
+        -- Inicia el hold para comenzar el casteo
         holdOn()
-        task.wait(0.9)
+
+        -- Espera a que aparezca la powerbar (max 3 segundos)
+        local timeout = tick() + 3
+        local barDetected = false
+        while tick() < timeout do
+            if isPowerBarVisible() then
+                barDetected = true
+                break
+            end
+            task.wait(0.05)
+        end
+
+        if barDetected then
+            -- Monitorea el fill hasta llegar al 80%
+            timeout = tick() + 4
+            while tick() < timeout do
+                local fill, bar = getCastFill()
+                if not fill or not bar then break end
+                local fillH = fill.AbsoluteSize.Y
+                local barH  = bar.AbsoluteSize.Y
+                if barH > 0 and (fillH / barH) >= 0.8 then
+                    break
+                end
+                task.wait(0.03)
+            end
+        else
+            -- Sin powerbar, espera fijo como fallback
+            task.wait(0.9)
+        end
+
         holdOff()
-        task.wait(1.5)
         fishStats.cast = fishStats.cast + 1
+        task.wait(1.2)
     end)
 end
 
@@ -870,7 +929,7 @@ VerLbl.Parent = CfgPage
 VerLbl.Size = UDim2.new(1, -10, 0, 18)
 VerLbl.Position = UDim2.new(0, 6, 0, 32)
 VerLbl.BackgroundTransparency = 1
-VerLbl.Text = "Version: 3.8  |  Hub: NOVACORE"
+VerLbl.Text = "Version: 3.9  |  Hub: NOVACORE"
 VerLbl.TextColor3 = Color3.fromRGB(150,150,150)
 VerLbl.Font = Enum.Font.Gotham
 VerLbl.TextSize = 11
@@ -993,4 +1052,4 @@ task.defer(function()
     activateTab(HomePage, HomeBtn, HomeInd)
 end)
 
-print("NOVACORE v3.8 cargado - Made BY JO21CX")
+print("NOVACORE v3.9 cargado - Made BY JO21CX")
